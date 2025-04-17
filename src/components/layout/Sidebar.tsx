@@ -144,10 +144,10 @@ export default function Sidebar() {
                             </div>
 
                             <div className="flex justify-between text-sm mb-4">
-                                <Link href="/followers" className="hover:underline">
+                                <Link href={`/profile/${session.user.handle}/followers`} className="hover:underline">
                                     <span className="font-bold">{followerCount}</span> Followers
                                 </Link>
-                                <Link href="/following" className="hover:underline">
+                                <Link href={`/profile/${session.user.handle}/following`} className="hover:underline">
                                     <span className="font-bold">{followingCount}</span> Following
                                 </Link>
                             </div>
