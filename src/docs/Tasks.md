@@ -248,9 +248,10 @@ This document tracks all tasks for the social media application development, the
 
 ## Next Steps
 
-1. Complete the profile editing functionality
-2. Finish the comment system implementation 
-3. Implement the search functionality
-4. Start work on community features
-5. Begin testing implementation
-6. Prepare for initial deployment
+1. Complete the profile editing functionality (P2) - This will allow users to customize their profiles
+2. Finish the comment system implementation (I5) - Essential for user engagement
+3. Complete the bookmark functionality UI (I6) - The API is ready, just needs frontend implementation
+4. Implement the search functionality (SE1, SE2, SE3) - Critical feature for user experience
+5. Start work on community features (C1, C6) - Begin with API endpoints and basic community page
+6. Handle image upload functionality (I7) - Required for complete post creation experience
+7. Fix high priority bugs (B2) - Address error handling for image uploads
