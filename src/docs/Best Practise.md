@@ -1,0 +1,9 @@
+- 🔁 **Reusable**: Build once, use anywhere in the app  
+- 🧩 **Modular**: Break UI into small, manageable pieces (under 100 lines of code is ideal. Fell free to use directories to organise[e.g. Instead of having one huge file with all uitility functions, create a utils dir and put associated groups of functions in their own file]) 
+- 🧠 **Separation of Concerns**: Logic and presentation stay cleanly divided  
+- ⚡ **Efficient**: Virtual DOM boosts rendering performance  
+- 🔧 **Maintainable**: Easier to debug and update in isolation  
+- 📈 **Scalable**: Ideal for growing, team-based projects  
+- 🎨 **Consistent**: Uniform look and behavior across the app  
+- 🧪 **Testable**: Components can be tested independently  
+- 🤝 **Collaborative**: Multiple devs can work in parallel on different components
