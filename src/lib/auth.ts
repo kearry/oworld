@@ -1,3 +1,5 @@
+// src/lib/auth.ts
+
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GitHubProvider from 'next-auth/providers/github';
@@ -8,10 +10,29 @@ import { compare } from 'bcrypt';
 import prisma from './db';
 import { signInSchema } from './validations';
 
+async function upsertSocialUser(profile: {
+    email?: string;
+    name?: string;
+    image?: string;
+}) {
+    if (!profile.email) return null;
+    let user = await prisma.user.findUnique({ where: { email: profile.email } });
+    if (user) return user;
+    user = await prisma.user.create({
+        data: {
+            email: profile.email,
+            username: profile.name?.replace(/\s+/g, '') ?? `user${Date.now()}`,
+            handle:
+                profile.name?.replace(/\s+/g, '').toLowerCase() ??
+                `user${Date.now()}`,
+            profileImage: profile.image,
+        },
+    });
+    return user;
+}
+
 export const authOptions: NextAuthOptions = {
-    session: {
-        strategy: 'jwt',
-    },
+    session: { strategy: 'jwt' },
     providers: [
         CredentialsProvider({
             name: 'Credentials',
@@ -20,41 +41,22 @@ export const authOptions: NextAuthOptions = {
                 password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
-                // Validate the credentials with Zod
-                const result = signInSchema.safeParse(credentials);
-
-                if (!result.success) {
-                    return null;
-                }
-
-                const { emailOrUsername, password } = result.data;
-
-                // Check if user exists
+                const parsed = signInSchema.safeParse(credentials);
+                if (!parsed.success) return null;
+                const { emailOrUsername, password } = parsed.data;
                 const user = await prisma.user.findFirst({
                     where: {
-                        OR: [
-                            { email: emailOrUsername },
-                            { username: emailOrUsername },
-                        ],
+                        OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
                     },
                 });
-
-                if (!user || !user.password) {
-                    return null;
-                }
-
-                // Check if password matches
-                const passwordValid = await compare(password, user.password);
-
-                if (!passwordValid) {
-                    return null;
-                }
-
+                if (!user || !user.password) return null;
+                const ok = await compare(password, user.password);
+                if (!ok) return null;
                 return {
                     id: user.id,
                     email: user.email,
                     name: user.username,
-                    image: user.profileImage,
+                    image: user.profileImage ?? undefined,
                 };
             },
         }),
@@ -78,29 +80,40 @@ export const authOptions: NextAuthOptions = {
     ],
     callbacks: {
         async jwt({ token, user, account }) {
-            if (user) {
-                token.id = user.id;
-                // If signing in with a social provider, create/update the user
-                if (account && account.provider !== 'credentials') {
-                    await handleSocialLogin(user, account);
+            if (account) {
+                const dbUser = await upsertSocialUser({
+                    email: token.email,
+                    name: token.name,
+                    image: (token as any).picture ?? (token as any).image,
+                });
+                if (dbUser) {
+                    token.id = dbUser.id;
                 }
+            } else if (user) {
+                token.id = user.id;
             }
             return token;
         },
         async session({ session, token }) {
-            if (token) {
+            if (token.id) {
                 session.user.id = token.id as string;
-
-                // Fetch additional user info
-                const userDetails = await prisma.user.findUnique({
+            }
+            let details = null;
+            if (token.id) {
+                details = await prisma.user.findUnique({
                     where: { id: token.id as string },
                     select: { handle: true, username: true },
                 });
-
-                if (userDetails) {
-                    session.user.handle = userDetails.handle;
-                    session.user.username = userDetails.username;
-                }
+            }
+            if (!details && session.user.email) {
+                details = await prisma.user.findUnique({
+                    where: { email: session.user.email },
+                    select: { handle: true, username: true },
+                });
+            }
+            if (details) {
+                session.user.handle = details.handle;
+                session.user.username = details.username;
             }
             return session;
         },
@@ -111,31 +124,6 @@ export const authOptions: NextAuthOptions = {
     },
 };
 
-async function handleSocialLogin(user: any, account: any) {
-    const existingUser = await prisma.user.findUnique({
-        where: { email: user.email },
-    });
-
-    if (!existingUser) {
-        // Create a new user with the social provider details
-        await prisma.user.create({
-            data: {
-                email: user.email,
-                username: user.name?.replace(/\s+/g, '') || `user_${Date.now()}`,
-                handle: `@${user.name?.replace(/\s+/g, '').toLowerCase() || `user_${Date.now()}`}`,
-                profileImage: user.image,
-            },
-        });
-    } else if (!existingUser.profileImage && user.image) {
-        // Update profile image if not set
-        await prisma.user.update({
-            where: { id: existingUser.id },
-            data: { profileImage: user.image },
-        });
-    }
-}
-
-// Type definition for session to include our custom fields
 declare module 'next-auth' {
     interface Session {
         user: {

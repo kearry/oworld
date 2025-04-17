@@ -1,27 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
+// src/app/api/users/by-handle/[handle]/route.ts
+
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 
-// GET /api/users/by-handle/[handle] - Get user by handle
 export async function GET(
-    request: NextRequest,
-    { params }: { params: { handle: string } }
+    request: Request,
+    context: { params: Promise<{ handle: string }> }
 ) {
+    // Await the params object before destructuring
+    const { handle: rawHandle } = await context.params;
+
+    if (!rawHandle) {
+        return NextResponse.json(
+            { error: 'Handle parameter missing' },
+            { status: 400 }
+        );
+    }
+
+    // Strip leading '@' if present
+    const handle = rawHandle.startsWith('@')
+        ? rawHandle.substring(1)
+        : rawHandle;
+
     try {
-        let { handle } = params;
-
-        // If handle starts with @, remove it
-        if (handle.startsWith('@')) {
-            handle = handle.substring(1);
-        }
-
-        // Find the user by handle
         const user = await prisma.user.findFirst({
-            where: {
-                handle: {
-                    equals: handle,
-                    mode: 'insensitive', // Case insensitive
-                },
-            },
+            where: { handle },
             select: {
                 id: true,
                 username: true,
@@ -33,18 +36,12 @@ export async function GET(
         });
 
         if (!user) {
-            return NextResponse.json(
-                { error: 'User not found' },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
         return NextResponse.json(user);
-    } catch (error) {
-        console.error('Error getting user by handle:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+    } catch (err) {
+        console.error('Error fetching user by handle:', err);
+        return NextResponse.json({ error: 'Server error' }, { status: 500 });
     }
 }

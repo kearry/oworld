@@ -1,5 +1,7 @@
+// src/components/layout/Sidebar.tsx
 'use client';
-import { useSession, signIn } from 'next-auth/react';
+
+import { useSession, signIn, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useUI } from '@/context/ui-context';
@@ -18,270 +20,218 @@ import {
     Sun,
     Menu,
     X,
-    LogIn
+    LogIn,
+    LogOut,
 } from 'lucide-react';
 
 export default function Sidebar() {
     const { data: session, status } = useSession();
-    const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = useUI();
+    const ui = useUI();
+    const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = ui;
     const pathname = usePathname();
     const [followerCount, setFollowerCount] = useState(0);
     const [followingCount, setFollowingCount] = useState(0);
 
+    // Debug logs
+    console.debug('[Sidebar] status:', status);
+    console.debug('[Sidebar] session.user:', session?.user);
+    console.debug('[Sidebar] UI context:', ui);
+
     const fetchFollowCounts = useCallback(async () => {
+        if (!session?.user?.id) return;
         try {
-            const response = await fetch(`/api/users/${session?.user.id}/follow-counts`);
+            console.debug('[Sidebar] fetching follow counts for', session.user.id);
+            const response = await fetch(
+                `/api/users/${session.user.id}/follow-counts`
+            );
             if (response.ok) {
                 const data = await response.json();
+                console.debug('[Sidebar] follow counts response:', data);
                 setFollowerCount(data.followers);
                 setFollowingCount(data.following);
             }
         } catch (error) {
-            console.error('Failed to fetch follow counts:', error);
+            console.error('[Sidebar] Failed to fetch follow counts:', error);
         }
     }, [session?.user?.id]);
 
     useEffect(() => {
-        if (session?.user?.id) {
-            fetchFollowCounts();
-        }
-    }, [session?.user?.id, fetchFollowCounts]);
+        fetchFollowCounts();
+    }, [fetchFollowCounts]);
 
-    // If loading, show a simplified sidebar
     if (status === 'loading') {
+        console.debug('[Sidebar] rendering loading skeleton');
         return (
             <aside className="fixed top-0 left-0 z-40 h-screen w-16 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
                 <div className="flex justify-center p-4">
-                    <div className="animate-pulse h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                    <div className="animate-pulse h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full" />
                 </div>
             </aside>
         );
     }
 
-    // If not authenticated, show login sidebar
     if (!session) {
+        console.debug('[Sidebar] user not signed in');
         return (
-            <aside className="fixed top-0 left-0 z-40 h-screen transition-all duration-300 
-                w-64 md:w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-                <div className="flex flex-col h-full px-3 py-4">
-                    <div className="flex justify-between items-center mb-6">
-                        <Link href="/" className="text-xl font-bold text-blue-500">SocialApp</Link>
-                    </div>
-
-                    <div className="flex-1 flex flex-col justify-center items-center space-y-6">
-                        <div className="text-center">
-                            <h2 className="text-2xl font-bold mb-2">Welcome to SocialApp</h2>
-                            <p className="text-gray-600 dark:text-gray-400 mb-6">Connect with friends and the world around you.</p>
-                        </div>
-
-                        <button
-                            onClick={() => signIn()}
-                            className="w-full flex items-center justify-center py-2.5 px-4 text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
-                        >
-                            <LogIn className="mr-2 h-5 w-5" />
-                            Sign In
-                        </button>
-
-                        <Link href="/auth/signup" className="text-blue-600 hover:underline">
-                            Don&apos;t have an account? Sign up
-                        </Link>
-                    </div>
-
-                    <div className="mt-auto">
-                        <button
-                            onClick={toggleDarkMode}
-                            className="flex items-center w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                            <span className="ml-3">
-                                {darkMode ? 'Light Mode' : 'Dark Mode'}
-                            </span>
-                        </button>
-                    </div>
-                </div>
+            <aside className="fixed top-0 left-0 z-40 h-screen w-16 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4">
+                <button
+                    onClick={() => {
+                        console.debug('[Sidebar] signIn() called');
+                        signIn();
+                    }}
+                    className="flex flex-col items-center space-y-1"
+                >
+                    <LogIn size={24} className="text-gray-500 dark:text-gray-400" />
+                    <span className="text-xs text-gray-600 dark:text-gray-300">Sign In</span>
+                </button>
             </aside>
         );
     }
 
-    // Authenticated sidebar (original code)
+    const displayName = session.user.username;
+    const displayHandle = session.user.handle;
+
+    console.debug('[Sidebar] rendering signed-in sidebar for handle:', displayHandle);
+
     return (
         <>
             <aside
-                className={`
-          fixed top-0 left-0 z-40 h-screen transition-all duration-300 
-          ${sidebarOpen ? 'w-64' : 'w-0 -translate-x-full md:w-16 md:translate-x-0'} 
-          bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
-        `}
+                className={`fixed top-0 left-0 z-40 h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-width duration-200 overflow-hidden ${sidebarOpen ? 'w-64' : 'w-16'
+                    }`}
             >
-                <div className="flex flex-col h-full px-3 py-4">
-                    <div className="flex justify-between items-center mb-6">
-                        {sidebarOpen ? (
-                            <Link href="/" className="text-xl font-bold text-blue-500">SocialApp</Link>
-                        ) : null}
-                        <button
-                            onClick={toggleSidebar}
-                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-                        </button>
-                    </div>
-
-                    {/* Profile section */}
+                {/* Header */}
+                <div className="flex items-center justify-between p-4">
                     {sidebarOpen && (
-                        <div className="mb-6">
-                            <div className="flex items-center space-x-3 mb-4">
-                                <Image
-                                    src={session.user.image || '/default-avatar.png'}
-                                    alt={session.user.username || 'User'}
-                                    width={48}
-                                    height={48}
-                                    className="rounded-full"
-                                />
-                                <div>
-                                    <h3 className="font-medium">{session.user.username || 'User'}</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{session.user.handle || '@user'}</p>
-                                </div>
-                            </div>
+                        <Link href="/" className="text-xl font-bold text-blue-500">
+                            SocialApp
+                        </Link>
+                    )}
+                    <button
+                        onClick={() => {
+                            console.debug('[Sidebar] toggleSidebar() called, now open:', !sidebarOpen);
+                            toggleSidebar();
+                        }}
+                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+                    </button>
+                </div>
 
-                            <div className="flex justify-between text-sm mb-4">
-                                <Link href={`/profile/${session.user.handle}/followers`} className="hover:underline">
-                                    <span className="font-bold">{followerCount}</span> Followers
-                                </Link>
-                                <Link href={`/profile/${session.user.handle}/following`} className="hover:underline">
-                                    <span className="font-bold">{followingCount}</span> Following
-                                </Link>
+                {/* Profile Section */}
+                {sidebarOpen && (
+                    <div className="mb-6 px-4">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <Image
+                                src={session.user.image ?? '/default-avatar.png'}
+                                alt={displayName}
+                                width={48}
+                                height={48}
+                                className="rounded-full"
+                            />
+                            <div>
+                                <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                                    {displayName}
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    @{displayHandle}
+                                </p>
                             </div>
                         </div>
-                    )}
-
-                    {/* Navigation links */}
-                    <nav className="flex-1">
-                        <ul className="space-y-2">
-                            <li>
-                                <Link
-                                    href="/"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <Home size={20} />
-                                    {sidebarOpen && <span className="ml-3">Home</span>}
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/search"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/search' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <Search size={20} />
-                                    {sidebarOpen && <span className="ml-3">Search</span>}
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/notifications"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/notifications' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <Bell size={20} />
-                                    {sidebarOpen && <span className="ml-3">Notifications</span>}
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/messages"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/messages' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <MessageSquare size={20} />
-                                    {sidebarOpen && <span className="ml-3">Messages</span>}
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/profile"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/profile' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <User size={20} />
-                                    {sidebarOpen && <span className="ml-3">Profile</span>}
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/analytics"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/analytics' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <BarChart2 size={20} />
-                                    {sidebarOpen && <span className="ml-3">Analytics</span>}
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/communities"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/communities' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <Users size={20} />
-                                    {sidebarOpen && <span className="ml-3">Communities</span>}
-                                </Link>
-                            </li>
-                        </ul>
-                    </nav>
-
-                    {/* Bottom section */}
-                    <div className="mt-auto">
-                        <ul className="space-y-2">
-                            <li>
-                                <Link
-                                    href="/settings"
-                                    className={`
-                    flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
-                    ${pathname === '/settings' ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                  `}
-                                >
-                                    <Settings size={20} />
-                                    {sidebarOpen && <span className="ml-3">Settings</span>}
-                                </Link>
-                            </li>
-                            <li>
-                                <button
-                                    onClick={toggleDarkMode}
-                                    className="flex items-center w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-                                >
-                                    {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                                    {sidebarOpen && (
-                                        <span className="ml-3">
-                                            {darkMode ? 'Light Mode' : 'Dark Mode'}
-                                        </span>
-                                    )}
-                                </button>
-                            </li>
-                        </ul>
+                        <div className="flex justify-between text-sm">
+                            <Link
+                                href={`/profile/${displayHandle}/followers`}
+                                className="hover:underline"
+                                onClick={() =>
+                                    console.debug('[Sidebar] navigate to followers of', displayHandle)
+                                }
+                            >
+                                <span className="font-bold">{followerCount}</span> Followers
+                            </Link>
+                            <Link
+                                href={`/profile/${displayHandle}/following`}
+                                className="hover:underline"
+                                onClick={() =>
+                                    console.debug('[Sidebar] navigate to following of', displayHandle)
+                                }
+                            >
+                                <span className="font-bold">{followingCount}</span> Following
+                            </Link>
+                        </div>
                     </div>
+                )}
+
+                {/* Navigation */}
+                <nav className="flex-1 px-2 space-y-1">
+                    {[
+                        { label: 'Home', icon: Home, href: '/' },
+                        { label: 'Search', icon: Search, href: '/search' },
+                        { label: 'Notifications', icon: Bell, href: '/notifications' },
+                        { label: 'Messages', icon: MessageSquare, href: '/messages' },
+                        { label: 'Profile', icon: User, href: `/profile/${displayHandle}` },
+                        { label: 'Analytics', icon: BarChart2, href: '/analytics' },
+                        { label: 'Communities', icon: Users, href: '/communities' },
+                    ].map(({ label, icon: Icon, href }) => (
+                        <Link
+                            key={label}
+                            href={href}
+                            onClick={() => console.debug('[Sidebar] nav click:', label, href)}
+                            className={`flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${pathname === href || pathname.startsWith(href + '/')
+                                    ? 'bg-gray-100 dark:bg-gray-700'
+                                    : ''
+                                }`}
+                        >
+                            <Icon size={20} />
+                            {sidebarOpen && <span className="ml-3">{label}</span>}
+                        </Link>
+                    ))}
+                </nav>
+
+                {/* Bottom Controls */}
+                <div className="mt-auto px-2 pb-4 space-y-1">
+                    <Link
+                        href="/settings"
+                        className={`flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${pathname.startsWith('/settings')
+                                ? 'bg-gray-100 dark:bg-gray-700'
+                                : ''
+                            }`}
+                        onClick={() => console.debug('[Sidebar] navigate to settings')}
+                    >
+                        <Settings size={20} />
+                        {sidebarOpen && <span className="ml-3">Settings</span>}
+                    </Link>
+                    <button
+                        onClick={() => {
+                            console.debug('[Sidebar] toggleDarkMode() called, now dark:', !darkMode);
+                            toggleDarkMode();
+                        }}
+                        className="flex items-center p-2 rounded-lg w-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                        {sidebarOpen && (
+                            <span className="ml-3">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => {
+                            console.debug('[Sidebar] signOut() called');
+                            signOut({ callbackUrl: '/auth/signin' });
+                        }}
+                        className="flex items-center p-2 rounded-lg w-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <LogOut size={20} />
+                        {sidebarOpen && <span className="ml-3">Logout</span>}
+                    </button>
                 </div>
             </aside>
 
-            {/* Overlay for mobile */}
+            {/* Mobile overlay */}
             {sidebarOpen && (
                 <div
-                    className="md:hidden fixed inset-0 z-30 bg-gray-900 bg-opacity-50"
-                    onClick={toggleSidebar}
+                    className="md:hidden fixed inset-0 z-30 bg-black bg-opacity-50"
+                    onClick={() => {
+                        console.debug('[Sidebar] overlay click, toggling sidebar');
+                        toggleSidebar();
+                    }}
                 />
             )}
         </>

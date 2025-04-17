@@ -1,4 +1,6 @@
+// src/context/ui-context.tsx
 'use client';
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
@@ -21,65 +23,56 @@ export function UIProvider({ children }: { children: ReactNode }) {
     const pathname = usePathname();
 
     const toggleSidebar = () => setSidebarOpen(prev => !prev);
+
     const toggleDarkMode = () => {
-        setDarkMode(prev => !prev);
-        // Save preference to localStorage
-        localStorage.setItem('darkMode', (!darkMode).toString());
-        // Apply dark mode class to html element
-        if (!darkMode) {
+        const newMode = !darkMode;
+        setDarkMode(newMode);
+        try {
+            localStorage.setItem('darkMode', newMode.toString());
+        } catch { }
+        if (newMode) {
             document.documentElement.classList.add('dark');
         } else {
             document.documentElement.classList.remove('dark');
         }
     };
 
-    // Handle scroll events for hiding/showing tab bar
+    // On mount, initialize from localStorage
     useEffect(() => {
-        const handleScroll = () => {
-            const currentPosition = window.scrollY;
-            setTabBarVisible(scrollPosition > currentPosition || currentPosition < 50);
-            setScrollPosition(currentPosition);
-        };
-
-        window.addEventListener('scroll', handleScroll);
-
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-        };
-    }, [scrollPosition]);
-
-    // Initialize dark mode from localStorage
-    useEffect(() => {
-        const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-        setDarkMode(savedDarkMode);
-        if (savedDarkMode) {
+        let saved = false;
+        try {
+            saved = localStorage.getItem('darkMode') === 'true';
+        } catch { }
+        if (saved) {
+            setDarkMode(true);
             document.documentElement.classList.add('dark');
         }
     }, []);
 
-    // Initialize sidebar state based on screen size
+    // Hide/show tab bar on scroll
+    useEffect(() => {
+        const handleScroll = () => {
+            const current = window.scrollY;
+            setTabBarVisible(scrollPosition > current || current < 50);
+            setScrollPosition(current);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [scrollPosition]);
+
+    // Adjust sidebar for mobile vs. desktop
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth < 768) {
-                setSidebarOpen(false);
-            } else {
-                setSidebarOpen(true);
-            }
+            setSidebarOpen(window.innerWidth >= 768);
         };
-
         window.addEventListener('resize', handleResize);
-        handleResize(); // Set initial state
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-        };
+        handleResize();
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Reset sidebar state when pathname changes (for mobile)
+    // Close mobile sidebar on navigation
     useEffect(() => {
-        if (window.innerWidth < 768) {
-            setSidebarOpen(false);
-        }
+        if (window.innerWidth < 768) setSidebarOpen(false);
     }, [pathname]);
 
     return (
@@ -100,7 +93,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
 
 export function useUI() {
     const context = useContext(UIContext);
-    if (context === undefined) {
+    if (!context) {
         throw new Error('useUI must be used within a UIProvider');
     }
     return context;

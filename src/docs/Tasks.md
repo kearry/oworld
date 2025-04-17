@@ -11,7 +11,6 @@ This document tracks all tasks for the social media application development, the
 - ⚪ **Deferred** - Task has been postponed for a later phase
 
 ## Project Setup
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Initialize Next.js project with TypeScript | 🟢 | Project created with `create-next-app` |
@@ -22,7 +21,6 @@ This document tracks all tasks for the social media application development, the
 | Add README with setup instructions | 🟢 | Basic README with setup and run instructions |
 
 ## Database & Data Models
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Set up Prisma ORM | 🟢 | Prisma client configured in `src/lib/db.ts` |
@@ -42,7 +40,6 @@ This document tracks all tasks for the social media application development, the
 | Create seed script | 🟢 | Added demo data for testing |
 
 ## Authentication System
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Set up NextAuth.js | 🟢 | Configured in `src/lib/auth.ts` |
@@ -58,7 +55,6 @@ This document tracks all tasks for the social media application development, the
 | Implement user session handling | 🟢 | Session with user details |
 
 ## Core UI Components
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create layout component | 🟢 | Root layout with session provider |
@@ -72,7 +68,6 @@ This document tracks all tasks for the social media application development, the
 | Create loader component | 🟢 | For loading states |
 
 ## Feed Functionality
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create feed context | 🟢 | Managing feed state |
@@ -86,11 +81,10 @@ This document tracks all tasks for the social media application development, the
 | Implement ad placement | 🟢 | One ad per 10 posts |
 
 ## User Profiles & Follow System
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create profile page | 🟡 | Basic profile page created, needs refinement |
-| Create profile edit functionality | 🔴 | Not started yet |
+| Create profile edit functionality | 🟡 | UI form wired to `PUT /api/users/:id`, Zod-validated |
 | Implement follow system | 🟢 | API routes and UI components |
 | Create follow button component | 🟢 | With multiple variants |
 | Implement followers page | 🟢 | List of user followers |
@@ -100,20 +94,18 @@ This document tracks all tasks for the social media application development, the
 | Implement follow notifications | 🟢 | For new followers |
 
 ## Post Creation & Interaction
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create post creation modal | 🟢 | With text and image support |
 | Implement post character count | 🟢 | With 300 char limit |
 | Create floating action button | 🟢 | For creating new posts |
 | Implement like functionality | 🟢 | With API and UI |
-| Implement comment functionality | 🟡 | API created, UI in progress |
-| Implement bookmark functionality | 🟡 | API created, UI implementation needed |
-| Create image upload functionality | 🔴 | API endpoint needed |
+| Implement comment functionality | 🟡 | Frontend UI in progress (API ready) |
+| Implement bookmark functionality | 🟡 | Bookmark button added; pending toast & icon feedback |
+| Create image upload functionality | 🟡 | Endpoint defined; client-side preview & progress needed |
 | Implement post sharing | 🔴 | Not started yet |
 
 ## Messaging System
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create messages page | 🟢 | With conversation list |
@@ -125,7 +117,6 @@ This document tracks all tasks for the social media application development, the
 | Add real-time messaging | 🔴 | Needs WebSocket integration |
 
 ## Notification System
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create notifications page | 🟢 | With notification list |
@@ -136,18 +127,16 @@ This document tracks all tasks for the social media application development, the
 | Implement real-time notifications | 🔴 | Needs WebSocket integration |
 
 ## Communities
-
 | Task | Status | Comments |
 |------|--------|----------|
-| Create communities page | 🔴 | Not started yet |
+| Create communities page | 🟡 | Basic layout & route scaffolding complete |
 | Implement community creation | 🔴 | Not started yet |
 | Create community profile | 🔴 | Not started yet |
 | Implement join/leave functionality | 🔴 | Not started yet |
 | Create community feed | 🔴 | Not started yet |
-| Implement community API | 🟡 | Basic models defined |
+| Implement community API | 🟡 | Models defined; endpoints for join/leave in dev |
 
 ## Analytics
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create analytics page | 🟢 | With various charts |
@@ -158,18 +147,16 @@ This document tracks all tasks for the social media application development, the
 | Implement data visualization | 🟢 | Using Recharts |
 
 ## Search Functionality
-
 | Task | Status | Comments |
 |------|--------|----------|
-| Create search page | 🔴 | Not started yet |
+| Create search page | 🟡 | Tabs for users/posts/communities under development |
 | Implement user search | 🔴 | Not started yet |
 | Implement post search | 🔴 | Not started yet |
 | Create community search | 🔴 | Not started yet |
-| Implement search API | 🔴 | Not started yet |
+| Implement search API | 🟡 | Debounce, pagination & error states pending |
 | Create search results display | 🔴 | Not started yet |
 
 ## Settings & User Preferences
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create settings page | 🔴 | Not started yet |
@@ -180,7 +167,6 @@ This document tracks all tasks for the social media application development, the
 | Implement theme settings | 🟡 | Dark mode implemented, other settings needed |
 
 ## Performance Optimization
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Implement image optimization | 🟡 | Using Next.js Image but needs improvement |
@@ -191,7 +177,6 @@ This document tracks all tasks for the social media application development, the
 | Add lazy loading | 🟡 | For images and some components |
 
 ## Testing
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Set up Jest | 🔴 | Not started yet |
@@ -202,7 +187,6 @@ This document tracks all tasks for the social media application development, the
 | Set up CI/CD testing | 🔴 | Not started yet |
 
 ## Deployment
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Configure production environment | 🔴 | Not started yet |
@@ -213,7 +197,6 @@ This document tracks all tasks for the social media application development, the
 | Create backup strategy | 🔴 | Not started yet |
 
 ## Documentation
-
 | Task | Status | Comments |
 |------|--------|----------|
 | Create API documentation | 🟡 | Some endpoints documented |
@@ -225,17 +208,15 @@ This document tracks all tasks for the social media application development, the
 | Maintain task list | 🟢 | This document! |
 
 ## Bugs & Issues
-
 | Issue | Status | Priority | Comments |
 |-------|--------|----------|----------|
 | Fix mobile navigation on small screens | 🔴 | Medium | Navigation needs adjustment |
-| Handle image upload errors | 🔴 | High | Error handling for uploads |
-| Fix dark mode persistence bug | 🔴 | Low | Sometimes resets on reload |
+| Handle image upload errors | 🟡 | High | Added retry logic & user‑friendly messages |
+| Fix dark mode persistence bug | 🔴 | Low | |
 | Optimize feed loading performance | 🟡 | Medium | Initial load is slow |
-| Fix notification count display | 🔴 | Low | Count is sometimes incorrect |
+| Fix notification count display | 🔴 | Low | |
 
 ## Future Enhancements
-
 | Feature | Status | Priority | Comments |
 |---------|--------|----------|----------|
 | Add video uploads | ⚪ | Low | For phase 2 |
@@ -247,11 +228,11 @@ This document tracks all tasks for the social media application development, the
 | Add content moderation | 🔴 | High | Needed before public launch |
 
 ## Next Steps
+1. Complete the profile editing functionality (P2)  
+2. Finish the comment system implementation (I5)  
+3. Complete the bookmark functionality UI (I6)  
+4. Implement the search functionality (SE1–SE3)  
+5. Start work on community features (C1, C6)  
+6. Handle image upload functionality (I7)  
+7. Fix high priority bugs (B2)  
 
-1. Complete the profile editing functionality (P2) - This will allow users to customize their profiles
-2. Finish the comment system implementation (I5) - Essential for user engagement
-3. Complete the bookmark functionality UI (I6) - The API is ready, just needs frontend implementation
-4. Implement the search functionality (SE1, SE2, SE3) - Critical feature for user experience
-5. Start work on community features (C1, C6) - Begin with API endpoints and basic community page
-6. Handle image upload functionality (I7) - Required for complete post creation experience
-7. Fix high priority bugs (B2) - Address error handling for image uploads

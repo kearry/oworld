@@ -1,62 +1,44 @@
-import { useState, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+// src/app/api/users/[id]/followers/route.ts
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/db';
 
-interface UseFollowUserResult {
-    isFollowing: boolean;
-    isLoading: boolean;
-    error: string | null;
-    toggleFollow: () => Promise<void>;
-}
-
-export default function useFollowUser(userId: string, initialFollowState = false): UseFollowUserResult {
-    const { data: session } = useSession();
-    const [isFollowing, setIsFollowing] = useState<boolean>(initialFollowState);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const toggleFollow = useCallback(async () => {
-        if (!session?.user) {
-            setError('You must be signed in to follow users');
-            return;
+export async function GET(
+    req: Request,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const userId = params.id;
+        if (!userId) {
+            return NextResponse.json(
+                { error: 'User ID parameter is missing' },
+                { status: 400 }
+            );
         }
 
-        // Don't allow following self
-        if (session.user.id === userId) {
-            setError('You cannot follow yourself');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            setError(null);
-
-            const method = isFollowing ? 'DELETE' : 'POST';
-            const response = await fetch(`/api/users/${userId}/follow`, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
+        // Fetch follower records
+        const follows = await prisma.follow.findMany({
+            where: { followingId: userId },
+            include: {
+                follower: {
+                    select: {
+                        id: true,
+                        username: true,
+                        handle: true,
+                        profileImage: true,
+                        bio: true,
+                    },
                 },
-            });
+            },
+        });
 
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to update follow status');
-            }
-
-            // Toggle the following state
-            setIsFollowing(!isFollowing);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-            console.error('Error toggling follow:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [session, userId, isFollowing]);
-
-    return {
-        isFollowing,
-        isLoading,
-        error,
-        toggleFollow,
-    };
+        // Return the array directly
+        const followersArray = follows.map((f) => f.follower);
+        return NextResponse.json(followersArray);
+    } catch (error) {
+        console.error('Error fetching followers:', error);
+        return NextResponse.json(
+            { error: 'Failed to fetch followers' },
+            { status: 500 }
+        );
+    }
 }
