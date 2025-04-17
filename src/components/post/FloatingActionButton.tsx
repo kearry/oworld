@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { PlusIcon, X } from 'lucide-react';
+import { PlusIcon } from 'lucide-react';
 import CreatePostModal from './CreatePostModal';
 
 export default function FloatingActionButton() {

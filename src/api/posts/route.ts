@@ -2,7 +2,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { hash } from 'bcrypt';
 import { postCreateSchema } from '@/lib/validations';
 import prisma from '@/lib/db';
 import { authOptions } from '@/lib/auth';

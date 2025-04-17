@@ -1,3 +1,5 @@
+'use client';
+
 import { Suspense } from 'react';
 import { FeedProvider } from '@/context/feed-context';
 import TabBar from '@/components/feed/TabBar';

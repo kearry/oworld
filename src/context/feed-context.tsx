@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Post, Community } from '@/lib/validations';
 
@@ -36,13 +36,6 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         }
     }, [session?.user.id]);
 
-    // Fetch posts when active tab changes
-    useEffect(() => {
-        if (session?.user.id) {
-            refreshFeed();
-        }
-    }, [activeTab, session?.user.id]);
-
     const fetchUserCommunities = async () => {
         try {
             const response = await fetch(`/api/communities/user`);
@@ -55,7 +48,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const fetchPosts = async (pageNum: number, replace = false) => {
+    const fetchPosts = useCallback(async (pageNum: number, replace = false) => {
         if (loading) return;
 
         setLoading(true);
@@ -88,19 +81,26 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeTab, loading]);
 
-    const loadMorePosts = async () => {
+    const loadMorePosts = useCallback(async () => {
         if (hasMore && !loading) {
             await fetchPosts(page + 1);
         }
-    };
+    }, [fetchPosts, hasMore, loading, page]);
 
-    const refreshFeed = async () => {
+    const refreshFeed = useCallback(async () => {
         setPage(1);
         setHasMore(true);
         await fetchPosts(1, true);
-    };
+    }, [fetchPosts]);
+
+    // Fetch posts when active tab changes
+    useEffect(() => {
+        if (session?.user.id) {
+            refreshFeed();
+        }
+    }, [activeTab, session?.user.id, refreshFeed]);
 
     return (
         <FeedContext.Provider

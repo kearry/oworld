@@ -1,9 +1,9 @@
 'use client';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useUI } from '@/context/ui-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import {
     Home,
@@ -17,24 +17,18 @@ import {
     Moon,
     Sun,
     Menu,
-    X
+    X,
+    LogIn
 } from 'lucide-react';
-import { Follow } from '@/lib/validations';
 
 export default function Sidebar() {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = useUI();
     const pathname = usePathname();
     const [followerCount, setFollowerCount] = useState(0);
     const [followingCount, setFollowingCount] = useState(0);
 
-    useEffect(() => {
-        if (session?.user?.id) {
-            fetchFollowCounts();
-        }
-    }, [session?.user?.id]);
-
-    const fetchFollowCounts = async () => {
+    const fetchFollowCounts = useCallback(async () => {
         try {
             const response = await fetch(`/api/users/${session?.user.id}/follow-counts`);
             if (response.ok) {
@@ -45,12 +39,71 @@ export default function Sidebar() {
         } catch (error) {
             console.error('Failed to fetch follow counts:', error);
         }
-    };
+    }, [session?.user?.id]);
 
-    if (!session) {
-        return null; // Don't show sidebar if not logged in
+    useEffect(() => {
+        if (session?.user?.id) {
+            fetchFollowCounts();
+        }
+    }, [session?.user?.id, fetchFollowCounts]);
+
+    // If loading, show a simplified sidebar
+    if (status === 'loading') {
+        return (
+            <aside className="fixed top-0 left-0 z-40 h-screen w-16 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+                <div className="flex justify-center p-4">
+                    <div className="animate-pulse h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                </div>
+            </aside>
+        );
     }
 
+    // If not authenticated, show login sidebar
+    if (!session) {
+        return (
+            <aside className="fixed top-0 left-0 z-40 h-screen transition-all duration-300 
+                w-64 md:w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col h-full px-3 py-4">
+                    <div className="flex justify-between items-center mb-6">
+                        <Link href="/" className="text-xl font-bold text-blue-500">SocialApp</Link>
+                    </div>
+
+                    <div className="flex-1 flex flex-col justify-center items-center space-y-6">
+                        <div className="text-center">
+                            <h2 className="text-2xl font-bold mb-2">Welcome to SocialApp</h2>
+                            <p className="text-gray-600 dark:text-gray-400 mb-6">Connect with friends and the world around you.</p>
+                        </div>
+
+                        <button
+                            onClick={() => signIn()}
+                            className="w-full flex items-center justify-center py-2.5 px-4 text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
+                        >
+                            <LogIn className="mr-2 h-5 w-5" />
+                            Sign In
+                        </button>
+
+                        <Link href="/auth/signup" className="text-blue-600 hover:underline">
+                            Don't have an account? Sign up
+                        </Link>
+                    </div>
+
+                    <div className="mt-auto">
+                        <button
+                            onClick={toggleDarkMode}
+                            className="flex items-center w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                            <span className="ml-3">
+                                {darkMode ? 'Light Mode' : 'Dark Mode'}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+        );
+    }
+
+    // Authenticated sidebar (original code)
     return (
         <>
             <aside
@@ -79,14 +132,14 @@ export default function Sidebar() {
                             <div className="flex items-center space-x-3 mb-4">
                                 <Image
                                     src={session.user.image || '/default-avatar.png'}
-                                    alt={session.user.username}
+                                    alt={session.user.username || 'User'}
                                     width={48}
                                     height={48}
                                     className="rounded-full"
                                 />
                                 <div>
-                                    <h3 className="font-medium">{session.user.username}</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{session.user.handle}</p>
+                                    <h3 className="font-medium">{session.user.username || 'User'}</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">{session.user.handle || '@user'}</p>
                                 </div>
                             </div>
 

@@ -1,11 +1,26 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useFeed } from '@/context/feed-context';
 import PostCard from '@/components/post/PostCard';
 import AdCard from '@/components/feed/AdCard';
 import { Loader2 } from 'lucide-react';
-import { Advertisement } from '@/lib/validations';
+import { Advertisement, Post } from '@/lib/validations';
+
+// Define the complete post type with all properties required by PostCard
+interface CompletePost extends Post {
+    author: {
+        username: string;
+        handle: string;
+        profileImage: string | null;
+    };
+    _count: {
+        comments: number;
+        likes: number;
+    };
+    liked?: boolean;
+    bookmarked?: boolean;
+}
 
 export default function Feed() {
     const { posts, loading, error, hasMore, loadMorePosts } = useFeed();
@@ -46,12 +61,17 @@ export default function Feed() {
 
     // Function to insert ads at specific positions (max 1 ad per 10 posts)
     const getContentWithAds = () => {
-        const content = [];
+        const content: React.ReactNode[] = [];
         let adIndex = 0;
 
         posts.forEach((post, index) => {
+            // Type assertion to ensure post is treated as CompletePost
+            // Since we know the API will return the complete structure
+            const fullPost = post as unknown as CompletePost;
+
+            // Add post to content
             content.push(
-                <PostCard key={post.id} post={post} />
+                <PostCard key={post.id} post={fullPost} />
             );
 
             // Show an ad after every 10 posts
