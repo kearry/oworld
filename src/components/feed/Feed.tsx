@@ -1,3 +1,4 @@
+'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useFeed } from '@/context/feed-context';
@@ -101,7 +102,7 @@ export default function Feed() {
                     {/* End of feed message */}
                     {!hasMore && (
                         <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                            You've reached the end of your feed.
+                            You&apos;ve reached the end of your feed.
                         </div>
                     )}
                 </>

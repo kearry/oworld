@@ -1,3 +1,4 @@
+'use client';
 import { useState } from 'react';
 import { PlusIcon, X } from 'lucide-react';
 import CreatePostModal from './CreatePostModal';

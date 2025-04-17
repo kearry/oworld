@@ -169,7 +169,7 @@ export default function MessagesPage() {
                     senderId: activeConversation.userId,
                     recipientId: session?.user.id || '',
                     read: true,
-                    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+                    createdAt: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
                     sender: {
                         id: activeConversation.userId,
                         username: activeConversation.username,
@@ -183,7 +183,7 @@ export default function MessagesPage() {
                     senderId: session?.user.id || '',
                     recipientId: activeConversation.userId,
                     read: true,
-                    createdAt: new Date(Date.now() - 1000 * 60 * 29).toISOString(), // 29 minutes ago
+                    createdAt: new Date(Date.now() - 1000 * 60 * 29), // 29 minutes ago
                     sender: {
                         id: session?.user.id || '',
                         username: session?.user.username || '',
@@ -193,11 +193,11 @@ export default function MessagesPage() {
                 },
                 {
                     id: '3',
-                    content: 'I'm good, thanks! Just checking out the new features on the platform.Have you seen the new analytics page?',
+                    content: 'I\'m good, thanks! Just checking out the new features on the platform.Have you seen the new analytics page?',
           senderId: activeConversation.userId,
                     recipientId: session?.user.id || '',
                     read: true,
-                    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(), // 25 minutes ago
+                    createdAt: new Date(Date.now() - 1000 * 60 * 25), // 25 minutes ago
                     sender: {
                         id: activeConversation.userId,
                         username: activeConversation.username,
@@ -207,11 +207,11 @@ export default function MessagesPage() {
                 },
                 {
                     id: '4',
-                    content: 'Not yet, I'll have to check it out.I've been busy working on a new post.',
+                    content: 'Not yet, I\'ll have to check it out.I\'ve been busy working on a new post.',
                     senderId: session?.user.id || '',
                     recipientId: activeConversation.userId,
                     read: true,
-                    createdAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(), // 20 minutes ago
+                    createdAt: new Date(Date.now() - 1000 * 60 * 20), // 20 minutes ago
                     sender: {
                         id: session?.user.id || '',
                         username: session?.user.username || '',
@@ -261,7 +261,7 @@ export default function MessagesPage() {
                 senderId: session.user.id,
                 recipientId: activeConversation.userId,
                 read: false,
-                createdAt: new Date().toISOString(),
+                createdAt: new Date(),
                 sender: {
                     id: session.user.id,
                     username: session.user.username,
@@ -288,7 +288,7 @@ export default function MessagesPage() {
             // Clear input
             setNewMessage('');
         } catch (err) {
-            setError('Failed to send message');
+            setError('Failed to send message: '+error);
             console.error(err);
         } finally {
             setSendingMessage(false);

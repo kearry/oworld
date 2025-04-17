@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { useFeed } from '@/context/feed-context';
 import { useUI } from '@/context/ui-context';
