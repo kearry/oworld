@@ -85,12 +85,12 @@ tsconfig.tsbuildinfo
 .vercel
 .turbo
 storybook-static/
-public/uploads/
+public/uploads/*
+!public/uploads/.gitkeep
 
 # Debug
 .pnpm-debug.log*
 
 # Local Netlify folder
 .netlify
-
 package-lock.json

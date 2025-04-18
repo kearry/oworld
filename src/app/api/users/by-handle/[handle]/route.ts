@@ -1,29 +1,26 @@
-// src/app/api/users/by-handle/[handle]/route.ts
-
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 
 export async function GET(
-    request: Request,
-    context: { params: Promise<{ handle: string }> }
+    request: NextRequest,
+    { params }: { params: { handle: string } }
 ) {
-    // Await the params object before destructuring
-    const { handle: rawHandle } = await context.params;
-
-    if (!rawHandle) {
-        return NextResponse.json(
-            { error: 'Handle parameter missing' },
-            { status: 400 }
-        );
-    }
-
-    // Strip leading '@' if present
-    const handle = rawHandle.startsWith('@')
-        ? rawHandle.substring(1)
-        : rawHandle;
-
     try {
-        const user = await prisma.user.findFirst({
+        // Extract handle from params
+        const { handle: rawHandle } = params;
+
+        if (!rawHandle) {
+            return NextResponse.json(
+                { error: 'Handle parameter missing' },
+                { status: 400 }
+            );
+        }
+
+        // Strip leading '@' if present
+        const handle = rawHandle.startsWith('@') ? rawHandle.substring(1) : rawHandle;
+
+        // Query the database
+        const user = await prisma.user.findUnique({
             where: { handle },
             select: {
                 id: true,
@@ -36,12 +33,19 @@ export async function GET(
         });
 
         if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            return NextResponse.json(
+                { error: 'User not found' },
+                { status: 404 }
+            );
         }
 
+        // Return user data
         return NextResponse.json(user);
-    } catch (err) {
-        console.error('Error fetching user by handle:', err);
-        return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    } catch (error) {
+        console.error('Error fetching user by handle:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
     }
 }
