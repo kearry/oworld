@@ -1,112 +1,76 @@
 // src/app/api/posts/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { postCreateSchema } from '@/lib/validations';
-import prisma from '@/lib/db';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import prisma from '@/lib/db';
+import { postCreateSchema } from '@/lib/validations';
 
-// GET /api/posts - Get all posts (paginated)
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+    // Support pagination via ?page=1
+    const url = new URL(request.url);
+    const page = Math.max(Number(url.searchParams.get('page') ?? '1'), 1);
+    const take = 10;
+    const skip = (page - 1) * take;
+
     try {
-        const { searchParams } = new URL(request.url);
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = parseInt(searchParams.get('limit') || '10');
-        const skip = (page - 1) * limit;
-
         const posts = await prisma.post.findMany({
-            take: limit,
             skip,
-            orderBy: {
-                createdAt: 'desc',
-            },
+            take,
             include: {
                 author: {
-                    select: {
-                        id: true,
-                        username: true,
-                        handle: true,
-                        profileImage: true,
-                    },
+                    select: { id: true, username: true, handle: true, profileImage: true },
                 },
                 _count: {
-                    select: {
-                        comments: true,
-                        likes: true,
-                    },
+                    select: { comments: true, likes: true },
                 },
             },
+            orderBy: { createdAt: 'desc' },
         });
-
-        // Get total count for pagination
-        const total = await prisma.post.count();
-
-        return NextResponse.json({
-            posts,
-            pagination: {
-                total,
-                pages: Math.ceil(total / limit),
-                page,
-                limit,
-            },
-        });
+        return NextResponse.json(posts);
     } catch (error) {
         console.error('Error fetching posts:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
-// POST /api/posts - Create a new post
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
+    // Ensure user is authenticated
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    // Cast so TS recognizes .id
+    const userId = (session.user as { id: string }).id;
+
+    // Parse and validate request body
+    let data;
     try {
-        const session = await getServerSession(authOptions);
-
-        if (!session?.user) {
+        const body = await request.json();
+        const parsed = postCreateSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
-
-        const json = await request.json();
-
-        // Validate with Zod
-        const result = postCreateSchema.safeParse(json);
-
-        if (!result.success) {
-            return NextResponse.json(
-                { error: 'Invalid post data', issues: result.error.issues },
+                { error: parsed.error.flatten() },
                 { status: 400 }
             );
         }
+        data = parsed.data;
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
-        // Ensure the current user is the author
-        if (result.data.authorId !== session.user.id) {
-            return NextResponse.json(
-                { error: 'Unauthorized: cannot create posts for other users' },
-                { status: 403 }
-            );
-        }
-
-        // Create post
+    try {
         const post = await prisma.post.create({
             data: {
-                text: result.data.text,
-                images: result.data.images,
-                authorId: session.user.id,
-                communityId: result.data.communityId,
+                text: data.text,
+                images: data.images,
+                authorId: userId,
+                communityId: data.communityId,
             },
         });
-
         return NextResponse.json(post, { status: 201 });
     } catch (error) {
         console.error('Error creating post:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

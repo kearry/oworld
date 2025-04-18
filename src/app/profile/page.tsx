@@ -1,35 +1,36 @@
 // src/app/profile/page.tsx
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
-export default function ProfileIndexRedirect() {
-    const { data: session, status } = useSession();
+export default function ProfileRootPage() {
     const router = useRouter();
+    const { data: session, status } = useSession();
 
     useEffect(() => {
-        // 1. Still loading the session → do nothing
         if (status === 'loading') return;
 
-        // 2. Not signed in → go to sign-in
+        // 1. Not signed in → send to sign-in
         if (status === 'unauthenticated' || !session?.user) {
             router.replace('/auth/signin');
             return;
         }
 
-        // 3. Signed in but no handle → send to settings
-        const handle = session.user.handle;
-        if (!handle) {
-            console.error('No handle in session.user:', session.user);
-            router.replace('/settings');
+        // 2. Signed in & has handle → redirect to that handle’s page
+        // Cast so TS knows session.user.handle exists
+        const handle = (session.user as { handle: string }).handle;
+        if (handle) {
+            router.replace(`/profile/${handle}`);
             return;
         }
 
-        // 4. Valid handle → go to your profile
-        router.replace(`/profile/${handle}`);
+        // 3. Signed in but no handle → send to settings
+        console.error('No handle in session.user:', session.user);
+        router.replace('/settings');
     }, [session, status, router]);
 
+    // While redirecting, render nothing
     return null;
 }

@@ -1,35 +1,19 @@
+// src/app/api/users/[id]/following/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 
-// GET /api/users/[id]/following - Get users followed by the specified user
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+    context: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+    // Await the params promise to get the dynamic `id`
+    const { id: userId } = await context.params;
+
     try {
-        const userId = params.id;
-        const { searchParams } = new URL(request.url);
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = parseInt(searchParams.get('limit') || '20');
-        const skip = (page - 1) * limit;
-
-        // Check if user exists
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-        });
-
-        if (!user) {
-            return NextResponse.json(
-                { error: 'User not found' },
-                { status: 404 }
-            );
-        }
-
-        // Get users that this user follows
+        // Fetch all follow records where this user is the follower
         const follows = await prisma.follow.findMany({
-            where: {
-                followerId: userId
-            },
+            where: { followerId: userId },
             include: {
                 following: {
                     select: {
@@ -38,24 +22,22 @@ export async function GET(
                         handle: true,
                         profileImage: true,
                         bio: true,
+                        createdAt: true,
                     },
                 },
             },
-            skip,
-            take: limit,
-            orderBy: {
-                createdAt: 'desc', // Most recently followed users first
-            },
+            orderBy: { createdAt: 'desc' },
         });
 
-        // Extract following user details
-        const following = follows.map(follow => follow.following);
+        // Extract the followed users
+        const following = follows.map((f) => f.following);
 
-        return NextResponse.json(following);
+        // Return JSON response
+        return NextResponse.json({ userId, following });
     } catch (error) {
-        console.error('Error getting following:', error);
+        console.error('Error fetching following list:', error);
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: 'Internal Server Error' },
             { status: 500 }
         );
     }

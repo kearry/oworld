@@ -1,21 +1,15 @@
 // src/app/api/users/[id]/followers/route.ts
-import { NextResponse } from 'next/server';
+
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 
 export async function GET(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
-    try {
-        const userId = params.id;
-        if (!userId) {
-            return NextResponse.json(
-                { error: 'User ID parameter is missing' },
-                { status: 400 }
-            );
-        }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+    const { id: userId } = await context.params;
 
-        // Fetch follower records
+    try {
         const follows = await prisma.follow.findMany({
             where: { followingId: userId },
             include: {
@@ -26,18 +20,20 @@ export async function GET(
                         handle: true,
                         profileImage: true,
                         bio: true,
+                        createdAt: true,
                     },
                 },
             },
+            orderBy: { createdAt: 'desc' },
         });
 
-        // Return the array directly
-        const followersArray = follows.map((f) => f.follower);
-        return NextResponse.json(followersArray);
+        const followers = follows.map(f => f.follower);
+
+        return NextResponse.json({ userId, followers });
     } catch (error) {
         console.error('Error fetching followers:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch followers' },
+            { error: 'Internal Server Error' },
             { status: 500 }
         );
     }

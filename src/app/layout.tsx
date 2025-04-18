@@ -1,6 +1,6 @@
 // src/app/layout.tsx
 import './globals.css';
-import { Inter } from 'next/font/google';
+//import { Inter } from 'next/font/google';
 import type { Metadata } from 'next';
 import { ReactNode } from 'react';
 import { getServerSession } from 'next-auth/next';
@@ -9,7 +9,7 @@ import { UIProvider } from '@/context/ui-context';
 import ClientLayout from '@/components/layout/ClientLayout';
 import { authOptions } from '@/lib/auth';
 
-const inter = Inter({ subsets: ['latin'] });
+//const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'SocialApp',
   description: 'A social media application built with Next.js and TypeScript',

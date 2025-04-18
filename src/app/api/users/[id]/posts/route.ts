@@ -1,35 +1,19 @@
+// src/app/api/users/[id]/posts/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 
-// GET /api/users/[id]/posts - Get posts by a specific user
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+    context: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+    // Await the params promise to extract the dynamic `id`
+    const { id: userId } = await context.params;
+
     try {
-        const userId = params.id;
-        const { searchParams } = new URL(request.url);
-        const page = parseInt(searchParams.get('page') || '1');
-        const limit = parseInt(searchParams.get('limit') || '10');
-        const skip = (page - 1) * limit;
-
-        // Check if user exists
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-        });
-
-        if (!user) {
-            return NextResponse.json(
-                { error: 'User not found' },
-                { status: 404 }
-            );
-        }
-
-        // Get user's posts
+        // Fetch all posts by this user, including author info and engagement counts
         const posts = await prisma.post.findMany({
-            where: {
-                authorId: userId
-            },
+            where: { authorId: userId },
             include: {
                 author: {
                     select: {
@@ -47,17 +31,16 @@ export async function GET(
                 },
             },
             orderBy: {
-                createdAt: 'desc', // Most recent posts first
+                createdAt: 'desc',
             },
-            skip,
-            take: limit,
         });
 
-        return NextResponse.json(posts);
+        // Return the posts array as JSON
+        return NextResponse.json({ userId, posts });
     } catch (error) {
-        console.error('Error getting user posts:', error);
+        console.error('Error fetching user posts:', error);
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: 'Internal Server Error' },
             { status: 500 }
         );
     }

@@ -1,43 +1,36 @@
 // src/app/api/users/[id]/follow-counts/route.ts
-import { NextResponse } from 'next/server';
+
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 
 export async function GET(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+    // Await the params promise to extract `id`
+    const { id: userId } = await context.params;
+
     try {
-        // Await params before accessing its properties
-        const { id: userId } = await params;
-        if (!userId) {
-            return NextResponse.json(
-                { error: 'User ID parameter is missing' },
-                { status: 400 }
-            );
-        }
-
-        // Verify user exists
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) {
-            return NextResponse.json(
-                { error: 'User not found' },
-                { status: 404 }
-            );
-        }
-
-        // Count followers
+        // Count how many users follow this user
         const followersCount = await prisma.follow.count({
             where: { followingId: userId },
         });
 
+        // Count how many users this user is following
         const followingCount = await prisma.follow.count({
             where: { followerId: userId },
         });
-        return NextResponse.json({ followers: followersCount, following: followingCount });
+
+        // Return the counts as JSON
+        return NextResponse.json({
+            userId,
+            followers: followersCount,
+            following: followingCount,
+        });
     } catch (error) {
-        console.error('Error fetching follower count:', error);
+        console.error('Error fetching follow counts:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch follower count' },
+            { error: 'Internal Server Error' },
             { status: 500 }
         );
     }

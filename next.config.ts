@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['bcrypt'],
   images: {
     domains: [
       'lh3.googleusercontent.com',  // Google profile images
@@ -7,11 +8,12 @@ const nextConfig = {
       'picsum.photos',              // Lorem Picsum (used in seed data)
       'avatars.githubusercontent.com', // GitHub profile images
       'platform-lookaside.fbsbx.com', // Facebook profile images
-      'pbs.twimg.com',              // Twitter profile images
+      'pbs.twimg.com',
+      'localhost',                    // this is for local development
     ],
   },
   experimental: {
-    serverComponentsExternalPackages: ['bcrypt'],
+  
   },
 };
 

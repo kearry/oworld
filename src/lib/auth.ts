@@ -1,5 +1,4 @@
 // src/lib/auth.ts
-
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GitHubProvider from 'next-auth/providers/github';
@@ -9,26 +8,47 @@ import TwitterProvider from 'next-auth/providers/twitter';
 import { compare } from 'bcrypt';
 import prisma from './db';
 import { signInSchema } from './validations';
+import { JWT } from 'next-auth/jwt';
 
-async function upsertSocialUser(profile: {
-    email?: string;
-    name?: string;
-    image?: string;
-}) {
+// Define a more specific profile type for upsertSocialUser
+interface SocialProfile {
+    email?: string | null;
+    name?: string | null;
+    image?: string | null;
+}
+
+// Custom token type extending JWT
+interface CustomToken extends JWT {
+    id?: string;
+    picture?: string;
+}
+
+// Handle creating/upserting social login users
+async function upsertSocialUser(profile: SocialProfile) {
     if (!profile.email) return null;
-    let user = await prisma.user.findUnique({ where: { email: profile.email } });
-    if (user) return user;
-    user = await prisma.user.create({
+    const existing = await prisma.user.findUnique({ where: { email: profile.email } });
+    if (existing) return existing;
+
+    // Create new user
+    const baseHandle = profile.name
+        ? profile.name.replace(/\s+/g, '').toLowerCase()
+        : profile.email.split('@')[0];
+    let handle = baseHandle;
+    let counter = 1;
+    while (await prisma.user.findUnique({ where: { handle } })) {
+        counter++;
+        handle = `${baseHandle}${counter}`;
+        if (counter > 10) throw new Error('Could not create unique handle');
+    }
+
+    return prisma.user.create({
         data: {
             email: profile.email,
-            username: profile.name?.replace(/\s+/g, '') ?? `user${Date.now()}`,
-            handle:
-                profile.name?.replace(/\s+/g, '').toLowerCase() ??
-                `user${Date.now()}`,
-            profileImage: profile.image,
+            username: profile.name ?? baseHandle,
+            handle,
+            profileImage: profile.image || undefined,
         },
     });
-    return user;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -41,22 +61,31 @@ export const authOptions: NextAuthOptions = {
                 password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
+                if (!credentials) return null;
                 const parsed = signInSchema.safeParse(credentials);
                 if (!parsed.success) return null;
                 const { emailOrUsername, password } = parsed.data;
+
                 const user = await prisma.user.findFirst({
                     where: {
-                        OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
+                        OR: [
+                            { email: emailOrUsername },
+                            { username: emailOrUsername },
+                            { handle: emailOrUsername.replace(/^@/, '') },
+                        ],
                     },
                 });
-                if (!user || !user.password) return null;
-                const ok = await compare(password, user.password);
-                if (!ok) return null;
+                if (!user?.password) return null;
+
+                const valid = await compare(password, user.password);
+                if (!valid) return null;
+
                 return {
                     id: user.id,
                     email: user.email,
                     name: user.username,
-                    image: user.profileImage ?? undefined,
+                    image: user.profileImage,
+                    handle: user.handle,
                 };
             },
         }),
@@ -79,42 +108,47 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        async jwt({ token, user, account }) {
-            if (account) {
-                const dbUser = await upsertSocialUser({
-                    email: token.email,
-                    name: token.name,
-                    image: (token as any).picture ?? (token as any).image,
-                });
-                if (dbUser) {
-                    token.id = dbUser.id;
+        async jwt({ token, user, account, profile }) {
+            const customToken = token as CustomToken;
+            if (account && user) {
+                customToken.id = user.id;
+                if (account.provider !== 'credentials' && profile) {
+                    const dbUser = await upsertSocialUser({
+                        email: profile.email,
+                        name: profile.name,
+                        image: profile.image,
+                    });
+                    if (dbUser) customToken.id = dbUser.id;
                 }
-            } else if (user) {
-                token.id = user.id;
             }
-            return token;
+            return customToken;
         },
         async session({ session, token }) {
-            if (token.id) {
-                session.user.id = token.id as string;
+            const customToken = token as CustomToken;
+
+            // Only assign if session.user object exists
+            if (session.user && customToken.id) {
+                (session.user as any).id = customToken.id;
             }
-            let details = null;
-            if (token.id) {
-                details = await prisma.user.findUnique({
-                    where: { id: token.id as string },
-                    select: { handle: true, username: true },
-                });
+
+            // Refresh handle, name, image from DB if we have user.id
+            const sid = (session.user as any)?.id;
+            if (sid) {
+                try {
+                    const dbUser = await prisma.user.findUnique({
+                        where: { id: sid },
+                        select: { handle: true, username: true, profileImage: true },
+                    });
+                    if (dbUser && session.user) {
+                        (session.user as any).handle = dbUser.handle;
+                        (session.user as any).name = dbUser.username;
+                        (session.user as any).image = dbUser.profileImage;
+                    }
+                } catch {
+                    // ignore errors
+                }
             }
-            if (!details && session.user.email) {
-                details = await prisma.user.findUnique({
-                    where: { email: session.user.email },
-                    select: { handle: true, username: true },
-                });
-            }
-            if (details) {
-                session.user.handle = details.handle;
-                session.user.username = details.username;
-            }
+
             return session;
         },
     },
@@ -122,16 +156,6 @@ export const authOptions: NextAuthOptions = {
         signIn: '/auth/signin',
         error: '/auth/error',
     },
+    secret: process.env.NEXTAUTH_SECRET,
+    debug: process.env.NODE_ENV === 'development',
 };
-
-declare module 'next-auth' {
-    interface Session {
-        user: {
-            id: string;
-            email: string;
-            image?: string;
-            handle: string;
-            username: string;
-        };
-    }
-}

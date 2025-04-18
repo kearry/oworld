@@ -22,216 +22,275 @@ import {
     X,
     LogIn,
     LogOut,
+    Loader2,
 } from 'lucide-react';
+
+// Define the minimal shape of session.user we need
+interface SessionUser {
+    id: string;
+    name?: string | null;
+    username?: string;
+    handle?: string;
+    email?: string | null;
+    image?: string | null;
+}
 
 export default function Sidebar() {
     const { data: session, status } = useSession();
-    const ui = useUI();
-    const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = ui;
+    const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode, setSidebarOpen } = useUI();
     const pathname = usePathname();
-    const [followerCount, setFollowerCount] = useState(0);
-    const [followingCount, setFollowingCount] = useState(0);
+    const [followerCount, setFollowerCount] = useState<number | null>(null);
+    const [followingCount, setFollowingCount] = useState<number | null>(null);
+    const [loadingCounts, setLoadingCounts] = useState(false);
 
-    // Debug logs
-    console.debug('[Sidebar] status:', status);
-    console.debug('[Sidebar] session.user:', session?.user);
-    console.debug('[Sidebar] UI context:', ui);
+    // Safely cast session.user to our SessionUser interface
+    const sessionUser = (status === 'authenticated' && session?.user)
+        ? (session.user as SessionUser)
+        : null;
+
+    const currentUserId = sessionUser?.id ?? null;
 
     const fetchFollowCounts = useCallback(async () => {
-        if (!session?.user?.id) return;
+        if (!currentUserId) {
+            setFollowerCount(null);
+            setFollowingCount(null);
+            return;
+        }
+        setLoadingCounts(true);
         try {
-            console.debug('[Sidebar] fetching follow counts for', session.user.id);
-            const response = await fetch(
-                `/api/users/${session.user.id}/follow-counts`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                console.debug('[Sidebar] follow counts response:', data);
+            const res = await fetch(`/api/users/${currentUserId}/follow-counts`);
+            if (res.ok) {
+                const data = await res.json();
                 setFollowerCount(data.followers);
                 setFollowingCount(data.following);
+            } else {
+                console.error('[Sidebar] Failed to fetch follow counts', res.status);
+                setFollowerCount(0);
+                setFollowingCount(0);
             }
         } catch (error) {
-            console.error('[Sidebar] Failed to fetch follow counts:', error);
+            console.error('[Sidebar] Error fetching follow counts', error);
+            setFollowerCount(0);
+            setFollowingCount(0);
+        } finally {
+            setLoadingCounts(false);
         }
-    }, [session?.user?.id]);
+    }, [currentUserId]);
 
     useEffect(() => {
         fetchFollowCounts();
     }, [fetchFollowCounts]);
 
+    useEffect(() => {
+        const handleResize = () => {
+            setSidebarOpen(window.innerWidth >= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize();
+        return () => window.removeEventListener('resize', handleResize);
+    }, [setSidebarOpen]);
+
     if (status === 'loading') {
-        console.debug('[Sidebar] rendering loading skeleton');
         return (
-            <aside className="fixed top-0 left-0 z-40 h-screen w-16 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-                <div className="flex justify-center p-4">
-                    <div className="animate-pulse h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full" />
+            <aside
+                className={`fixed top-0 left-0 z-40 h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
+        flex flex-col transition-width duration-200 overflow-hidden ${sidebarOpen ? 'w-64' : 'w-16'}`}
+            >
+                <div className="p-4 flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-pulse text-gray-400" />
                 </div>
             </aside>
         );
     }
 
-    if (!session) {
-        console.debug('[Sidebar] user not signed in');
+    const handleSignIn = () => signIn();
+    const handleSignOut = () => signOut({ callbackUrl: '/auth/signin' });
+
+    if (status !== 'authenticated') {
         return (
-            <aside className="fixed top-0 left-0 z-40 h-screen w-16 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4">
+            <aside
+                className="fixed top-0 left-0 z-40 h-screen w-16 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
+        p-4 flex flex-col items-center space-y-4"
+            >
                 <button
-                    onClick={() => {
-                        console.debug('[Sidebar] signIn() called');
-                        signIn();
-                    }}
-                    className="flex flex-col items-center space-y-1"
+                    onClick={handleSignIn}
+                    aria-label="Sign In"
+                    className="flex flex-col items-center text-gray-600 dark:text-gray-300 hover:text-blue-500"
                 >
-                    <LogIn size={24} className="text-gray-500 dark:text-gray-400" />
-                    <span className="text-xs text-gray-600 dark:text-gray-300">Sign In</span>
+                    <LogIn size={24} />
+                    <span className="text-xs">Sign In</span>
+                </button>
+                <button
+                    onClick={toggleDarkMode}
+                    aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                    className="mt-auto flex flex-col items-center text-gray-600 dark:text-gray-300 hover:text-blue-500"
+                >
+                    {darkMode ? <Sun size={24} /> : <Moon size={24} />}
+                    <span className="text-xs">{darkMode ? 'Light' : 'Dark'}</span>
                 </button>
             </aside>
         );
     }
 
-    const displayName = session.user.username;
-    const displayHandle = session.user.handle;
-
-    console.debug('[Sidebar] rendering signed-in sidebar for handle:', displayHandle);
+    // Now that we're authenticated:
+    const user = sessionUser!;
+    const displayName = user.username || user.name || user.email || '';
+    const displayHandle = user.handle ? `@${user.handle}` : '';
+    const profileLink = `/profile/${user.handle}`;
 
     return (
         <>
             <aside
-                className={`fixed top-0 left-0 z-40 h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-width duration-200 overflow-hidden ${sidebarOpen ? 'w-64' : 'w-16'
-                    }`}
+                className={`fixed top-0 left-0 z-40 h-screen bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
+        flex flex-col transition-width duration-200 overflow-y-auto ${sidebarOpen ? 'w-64' : 'w-16'}`}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-4">
+                <div
+                    className={`flex items-center p-4 sticky top-0 bg-white dark:bg-gray-800 z-10
+        ${sidebarOpen ? 'justify-between' : 'justify-center'}`}
+                >
                     {sidebarOpen && (
-                        <Link href="/" className="text-xl font-bold text-blue-500">
+                        <Link href="/" className="text-xl font-bold text-blue-500 hover:opacity-80">
                             SocialApp
                         </Link>
                     )}
                     <button
-                        onClick={() => {
-                            console.debug('[Sidebar] toggleSidebar() called, now open:', !sidebarOpen);
-                            toggleSidebar();
-                        }}
-                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={toggleSidebar}
+                        aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                     >
                         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
                 </div>
 
-                {/* Profile Section */}
+                {/* Profile */}
                 {sidebarOpen && (
-                    <div className="mb-6 px-4">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <Image
-                                src={session.user.image ?? '/default-avatar.png'}
-                                alt={displayName}
-                                width={48}
-                                height={48}
-                                className="rounded-full"
-                            />
-                            <div>
-                                <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                                    {displayName}
-                                </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    @{displayHandle}
-                                </p>
+                    <div className="mb-6 px-4 pt-2">
+                        <Link
+                            href={profileLink}
+                            className="block hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-lg"
+                        >
+                            <div className="flex items-center space-x-3 mb-3">
+                                <Image
+                                    src={user.image ?? '/default-avatar.png'}
+                                    alt="Profile"
+                                    width={48}
+                                    height={48}
+                                    className="rounded-full bg-gray-200 dark:bg-gray-600"
+                                    onError={(e) => ((e.currentTarget as HTMLImageElement).src = '/default-avatar.png')}
+                                />
+                                <div className="overflow-hidden">
+                                    <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                        {displayName}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                        {displayHandle}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <Link
-                                href={`/profile/${displayHandle}/followers`}
-                                className="hover:underline"
-                                onClick={() =>
-                                    console.debug('[Sidebar] navigate to followers of', displayHandle)
-                                }
-                            >
-                                <span className="font-bold">{followerCount}</span> Followers
-                            </Link>
-                            <Link
-                                href={`/profile/${displayHandle}/following`}
-                                className="hover:underline"
-                                onClick={() =>
-                                    console.debug('[Sidebar] navigate to following of', displayHandle)
-                                }
-                            >
-                                <span className="font-bold">{followingCount}</span> Following
-                            </Link>
+                        </Link>
+                        <div className="flex justify-between text-sm px-2">
+                            {loadingCounts ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-400 mx-auto" />
+                            ) : (
+                                <>
+                                    <Link
+                                        href={`${profileLink}/followers`}
+                                        className="hover:underline text-gray-700 dark:text-gray-300"
+                                    >
+                                        <span className="font-bold">{followerCount ?? 0}</span>{' '}
+                                        Followers
+                                    </Link>
+                                    <Link
+                                        href={`${profileLink}/following`}
+                                        className="hover:underline text-gray-700 dark:text-gray-300"
+                                    >
+                                        <span className="font-bold">{followingCount ?? 0}</span>{' '}
+                                        Following
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/* Navigation */}
+                {/* Main Nav */}
                 <nav className="flex-1 px-2 space-y-1">
                     {[
                         { label: 'Home', icon: Home, href: '/' },
                         { label: 'Search', icon: Search, href: '/search' },
                         { label: 'Notifications', icon: Bell, href: '/notifications' },
                         { label: 'Messages', icon: MessageSquare, href: '/messages' },
-                        { label: 'Profile', icon: User, href: `/profile/${displayHandle}` },
+                        { label: 'Profile', icon: User, href: profileLink },
                         { label: 'Analytics', icon: BarChart2, href: '/analytics' },
                         { label: 'Communities', icon: Users, href: '/communities' },
-                    ].map(({ label, icon: Icon, href }) => (
-                        <Link
-                            key={label}
-                            href={href}
-                            onClick={() => console.debug('[Sidebar] nav click:', label, href)}
-                            className={`flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${pathname === href || pathname.startsWith(href + '/')
-                                    ? 'bg-gray-100 dark:bg-gray-700'
-                                    : ''
-                                }`}
-                        >
-                            <Icon size={20} />
-                            {sidebarOpen && <span className="ml-3">{label}</span>}
-                        </Link>
-                    ))}
+                    ].map(({ label, icon: Icon, href }) => {
+                        const isActive = href === pathname;
+                        const classes = `group flex items-center p-2 rounded-lg transition-colors
+              ${isActive
+                                ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`;
+                        return (
+                            <Link key={label} href={href} className={classes} aria-current={isActive ? 'page' : undefined}>
+                                <Icon size={20} className={sidebarOpen ? '' : 'mx-auto'} />
+                                {sidebarOpen && <span className="ml-3">{label}</span>}
+                                {!sidebarOpen && (
+                                    <span className="absolute left-full ml-2 px-2 py-1 text-xs font-medium text-white
+                      bg-gray-900 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        {label}
+                                    </span>
+                                )}
+                            </Link>
+                        );
+                    })}
                 </nav>
 
-                {/* Bottom Controls */}
-                <div className="mt-auto px-2 pb-4 space-y-1">
-                    <Link
-                        href="/settings"
-                        className={`flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${pathname.startsWith('/settings')
-                                ? 'bg-gray-100 dark:bg-gray-700'
-                                : ''
-                            }`}
-                        onClick={() => console.debug('[Sidebar] navigate to settings')}
-                    >
-                        <Settings size={20} />
-                        {sidebarOpen && <span className="ml-3">Settings</span>}
-                    </Link>
-                    <button
-                        onClick={() => {
-                            console.debug('[Sidebar] toggleDarkMode() called, now dark:', !darkMode);
-                            toggleDarkMode();
-                        }}
-                        className="flex items-center p-2 rounded-lg w-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                        {sidebarOpen && (
-                            <span className="ml-3">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-                        )}
-                    </button>
-                    <button
-                        onClick={() => {
-                            console.debug('[Sidebar] signOut() called');
-                            signOut({ callbackUrl: '/auth/signin' });
-                        }}
-                        className="flex items-center p-2 rounded-lg w-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        <LogOut size={20} />
-                        {sidebarOpen && <span className="ml-3">Logout</span>}
-                    </button>
+                {/* Bottom */}
+                <div className="mt-auto px-2 pb-4 space-y-1 sticky bottom-0 bg-white dark:bg-gray-800 py-2">
+                    {[
+                        { label: 'Settings', icon: Settings, href: '/settings' },
+                        { label: darkMode ? 'Light Mode' : 'Dark Mode', icon: darkMode ? Sun : Moon, action: toggleDarkMode },
+                        { label: 'Logout', icon: LogOut, action: handleSignOut },
+                    ].map(({ label, icon: Icon, href, action }) => {
+                        const isActive = href && pathname.startsWith(href);
+                        const classes = `group flex items-center p-2 rounded-lg w-full transition-colors
+              ${isActive
+                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`;
+                        const content = (
+                            <>
+                                <Icon size={20} className={sidebarOpen ? '' : 'mx-auto'} />
+                                {sidebarOpen && <span className="ml-3">{label}</span>}
+                                {!sidebarOpen && (
+                                    <span className="absolute left-full ml-2 px-2 py-1 text-xs font-medium text-white
+                      bg-gray-900 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        {label}
+                                    </span>
+                                )}
+                            </>
+                        );
+                        return href ? (
+                            <Link key={label} href={href} className={classes} aria-current={isActive ? 'page' : undefined}>
+                                {content}
+                            </Link>
+                        ) : (
+                            <button key={label} onClick={action} className={classes} aria-label={label}>
+                                {content}
+                            </button>
+                        );
+                    })}
                 </div>
             </aside>
 
-            {/* Mobile overlay */}
             {sidebarOpen && (
                 <div
-                    className="md:hidden fixed inset-0 z-30 bg-black bg-opacity-50"
-                    onClick={() => {
-                        console.debug('[Sidebar] overlay click, toggling sidebar');
-                        toggleSidebar();
-                    }}
+                    className="fixed inset-0 z-30 bg-black bg-opacity-50 md:hidden"
+                    onClick={toggleSidebar}
+                    aria-hidden="true"
                 />
             )}
         </>

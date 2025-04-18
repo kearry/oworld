@@ -1,3 +1,4 @@
+// src/hooks/useFollowUser.ts
 import { useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 
@@ -8,11 +9,19 @@ interface UseFollowUserResult {
     toggleFollow: () => Promise<void>;
 }
 
-export default function useFollowUser(userId: string, initialFollowState = false): UseFollowUserResult {
+export default function useFollowUser(
+    userId: string,
+    initialFollowState = false
+): UseFollowUserResult {
     const { data: session } = useSession();
     const [isFollowing, setIsFollowing] = useState<boolean>(initialFollowState);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Safely extract current user's ID from session
+    const currentUserId = session?.user
+        ? (session.user as { id: string }).id
+        : null;
 
     const toggleFollow = useCallback(async () => {
         if (!session?.user) {
@@ -21,7 +30,7 @@ export default function useFollowUser(userId: string, initialFollowState = false
         }
 
         // Don't allow following self
-        if (session.user.id === userId) {
+        if (currentUserId === userId) {
             setError('You cannot follow yourself');
             return;
         }
@@ -33,9 +42,7 @@ export default function useFollowUser(userId: string, initialFollowState = false
             const method = isFollowing ? 'DELETE' : 'POST';
             const response = await fetch(`/api/users/${userId}/follow`, {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
             });
 
             if (!response.ok) {
@@ -43,7 +50,6 @@ export default function useFollowUser(userId: string, initialFollowState = false
                 throw new Error(data.error || 'Failed to update follow status');
             }
 
-            // Toggle the following state
             setIsFollowing(!isFollowing);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
@@ -51,7 +57,7 @@ export default function useFollowUser(userId: string, initialFollowState = false
         } finally {
             setIsLoading(false);
         }
-    }, [session, userId, isFollowing]);
+    }, [currentUserId, isFollowing, session?.user, userId]);
 
     return {
         isFollowing,

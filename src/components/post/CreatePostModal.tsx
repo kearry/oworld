@@ -1,9 +1,13 @@
+// src/components/post/CreatePostModal.tsx
+'use client';
+
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
-import { X, ImageIcon, Smile, MapPin, Calendar, BarChart2, Loader2 } from 'lucide-react';
+import { X, ImageIcon, Smile, MapPin, Loader2 } from 'lucide-react';
 import { useFeed } from '@/context/feed-context';
 import { postCreateSchema } from '@/lib/validations';
+import { toast } from 'react-hot-toast';
 
 interface CreatePostModalProps {
     onClose: () => void;
@@ -12,286 +16,274 @@ interface CreatePostModalProps {
 export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     const { data: session } = useSession();
     const { refreshFeed } = useFeed();
+
+    // Safely extract the current user ID
+    const currentUserId = session?.user
+        ? (session.user as { id: string }).id
+        : '';
+
     const [text, setText] = useState('');
-    const [images, setImages] = useState<File[]>([]);
     const [imageUrls, setImageUrls] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const [uploadingImages, setUploadingImages] = useState(false);
     const [characterCount, setCharacterCount] = useState(0);
     const [error, setError] = useState<string | null>(null);
+
     const maxCharCount = 300;
+    const maxImages = 4;
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+
     const modalRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Focus textarea on open
     useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.focus();
-        }
+        textareaRef.current?.focus();
     }, []);
 
-    // Close modal on click outside
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        function onClickOutside(e: MouseEvent) {
+            if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
                 onClose();
             }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        }
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
     }, [onClose]);
 
-    // Escape key closes modal
     useEffect(() => {
-        const handleEscapeKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onClose();
-            }
-        };
-
-        document.addEventListener('keydown', handleEscapeKey);
-        return () => {
-            document.removeEventListener('keydown', handleEscapeKey);
-        };
+        function onKeyDown(e: KeyboardEvent) {
+            if (e.key === 'Escape') onClose();
+        }
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
     }, [onClose]);
 
     const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newText = e.target.value;
-        setText(newText);
-        setCharacterCount(newText.length);
+        if (newText.length <= maxCharCount) {
+            setText(newText);
+            setCharacterCount(newText.length);
+        }
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const newFiles = Array.from(e.target.files);
-            const totalImages = [...images, ...newFiles];
-
-            // Limit to 4 images
-            if (totalImages.length > 4) {
-                setError('You can only upload up to 4 images');
-                return;
-            }
-
-            setImages(totalImages);
-
-            // Create object URLs for preview
-            const newImageUrls = newFiles.map(file => URL.createObjectURL(file));
-            setImageUrls([...imageUrls, ...newImageUrls]);
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files) return;
+        const file = files[0];
+        if (!file.type.startsWith('image/') || file.size > maxFileSize) {
+            toast.error('Please select an image under 5MB');
+            return;
+        }
+        setUploadingImages(true);
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed');
+            setImageUrls((prev) => [...prev, data.url]);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Upload error');
+        } finally {
+            setUploadingImages(false);
         }
     };
 
     const removeImage = (index: number) => {
-        const newImages = [...images];
-        const newImageUrls = [...imageUrls];
-
-        // Revoke object URL to avoid memory leaks
-        URL.revokeObjectURL(newImageUrls[index]);
-
-        newImages.splice(index, 1);
-        newImageUrls.splice(index, 1);
-
-        setImages(newImages);
-        setImageUrls(newImageUrls);
+        setImageUrls((prev) => prev.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async () => {
-        if (!session?.user) return;
-
-        // Validate text length
-        if (text.trim().length === 0) {
-            setError('Post cannot be empty');
+        if (!currentUserId) {
+            toast.error('You must be signed in to post');
             return;
         }
+        setLoading(true);
+        setError(null);
 
-        if (text.length > maxCharCount) {
-            setError(`Post exceeds maximum character limit of ${maxCharCount}`);
+        const trimmedText = text.trim();
+        const postData = {
+            text: trimmedText,
+            authorId: currentUserId,
+            ...(imageUrls.length > 0 && { images: JSON.stringify(imageUrls) }),
+        };
+
+        const parsed = postCreateSchema.safeParse(postData);
+        if (!parsed.success) {
+            setError(parsed.error.errors[0]?.message || 'Invalid post data');
+            setLoading(false);
             return;
         }
 
         try {
-            setLoading(true);
-            setError(null);
-
-            // Upload images if any
-            let uploadedImageUrls: string[] = [];
-
-            if (images.length > 0) {
-                const formData = new FormData();
-                images.forEach(image => {
-                    formData.append('images', image);
-                });
-
-                const uploadResponse = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!uploadResponse.ok) {
-                    throw new Error('Failed to upload images');
-                }
-
-                const uploadResult = await uploadResponse.json();
-                uploadedImageUrls = uploadResult.urls;
-            }
-
-            // Create the post
-            const postData = {
-                text,
-                images: uploadedImageUrls.length > 0 ? JSON.stringify(uploadedImageUrls) : undefined,
-                authorId: session.user.id,
-            };
-
-            // Validate with Zod
-            const result = postCreateSchema.safeParse(postData);
-
-            if (!result.success) {
-                setError(result.error.errors[0]?.message || 'Invalid post data');
-                return;
-            }
-
             const response = await fetch('/api/posts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(postData),
+                body: JSON.stringify(parsed.data),
             });
-
             if (!response.ok) {
-                throw new Error('Failed to create post');
+                const errData = await response.json();
+                throw new Error(errData.error || 'Failed to create post');
             }
-
-            // Refresh the feed to show the new post
+            toast.success('Post created successfully!');
             refreshFeed();
             onClose();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+            const msg = err instanceof Error ? err.message : 'Unexpected error';
+            setError(msg);
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
     };
 
-    // Clean up object URLs when component unmounts
-    useEffect(() => {
-        return () => {
-            imageUrls.forEach(url => URL.revokeObjectURL(url));
-        };
-    }, [imageUrls]);
+    const canSubmit =
+        !loading &&
+        (text.trim().length > 0 || imageUrls.length > 0) &&
+        characterCount <= maxCharCount;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
             <div
                 ref={modalRef}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col"
+                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+                role="dialog"
+                aria-modal="true"
             >
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h2 className="text-xl font-bold">Create Post</h2>
+                {/* Header */}
+                <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                        Create Post
+                    </h2>
                     <button
                         onClick={onClose}
+                        disabled={loading}
                         className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        aria-label="Close"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="p-4 flex-1 overflow-y-auto">
+                {/* Body */}
+                <div className="p-4 flex-1 overflow-y-auto space-y-4">
                     {error && (
-                        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg">
+                        <div className="p-3 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-200 rounded">
                             {error}
                         </div>
                     )}
 
                     <div className="flex space-x-3">
-                        {session?.user?.image && (
+                        {session?.user?.image ? (
                             <Image
                                 src={session.user.image}
-                                alt={session.user.username || 'User'}
+                                alt="User avatar"
                                 width={48}
                                 height={48}
                                 className="rounded-full"
                             />
+                        ) : (
+                            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full" />
                         )}
-
-                        <div className="flex-1">
-                            <textarea
-                                ref={textareaRef}
-                                value={text}
-                                onChange={handleTextChange}
-                                placeholder="What's happening?"
-                                className="w-full min-h-[100px] bg-transparent border-none focus:ring-0 resize-none"
-                                maxLength={maxCharCount}
-                            />
-
-                            {/* Image previews */}
-                            {imageUrls.length > 0 && (
-                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                    {imageUrls.map((url, index) => (
-                                        <div key={index} className="relative rounded-lg overflow-hidden">
-                                            <Image
-                                                src={url}
-                                                alt={`Selected image ${index + 1}`}
-                                                width={200}
-                                                height={200}
-                                                className="object-cover"
-                                            />
-                                            <button
-                                                onClick={() => removeImage(index)}
-                                                className="absolute top-2 right-2 bg-black bg-opacity-50 rounded-full p-1 text-white"
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        <textarea
+                            ref={textareaRef}
+                            value={text}
+                            onChange={handleTextChange}
+                            placeholder="What's happening?"
+                            className="w-full bg-transparent outline-none resize-none p-0 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                            rows={4}
+                        />
                     </div>
+
+                    {/* Image previews */}
+                    {imageUrls.length > 0 && (
+                        <div
+                            className={`grid gap-2 ${imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'
+                                }`}
+                        >
+                            {imageUrls.map((url, idx) => (
+                                <div
+                                    key={idx}
+                                    className="relative aspect-square rounded-lg overflow-hidden"
+                                >
+                                    <Image
+                                        src={url}
+                                        alt={`Preview ${idx + 1}`}
+                                        fill
+                                        className="object-cover"
+                                    />
+                                    <button
+                                        onClick={() => removeImage(idx)}
+                                        className="absolute top-1 right-1 bg-black bg-opacity-60 p-1 rounded-full text-white hover:bg-opacity-80"
+                                        aria-label={`Remove image ${idx + 1}`}
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex justify-between items-center mb-3">
-                        <div className="flex space-x-2">
-                            <label htmlFor="image-upload" className="cursor-pointer text-blue-500 hover:text-blue-600">
-                                <ImageIcon size={20} />
-                                <input
-                                    id="image-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                />
-                            </label>
-
-                            <button className="text-blue-500 hover:text-blue-600">
-                                <Smile size={20} />
-                            </button>
-
-                            <button className="text-blue-500 hover:text-blue-600">
-                                <MapPin size={20} />
-                            </button>
-                        </div>
-
-                        <div className="text-xs text-gray-500">
-                            {characterCount}/{maxCharCount}
-                        </div>
+                {/* Footer */}
+                <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex space-x-2">
+                        <label
+                            htmlFor="post-image-upload"
+                            className={`cursor-pointer p-2 rounded-full ${imageUrls.length >= maxImages || loading
+                                    ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                                    : 'text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+                                }`}
+                        >
+                            <ImageIcon size={20} />
+                            <input
+                                id="post-image-upload"
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageUpload}
+                                disabled={imageUrls.length >= maxImages || loading}
+                            />
+                        </label>
+                        <button
+                            disabled={loading}
+                            className="text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-2 rounded-full"
+                            aria-label="Add emoji (coming soon)"
+                        >
+                            <Smile size={20} />
+                        </button>
+                        <button
+                            disabled={loading}
+                            className="text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 p-2 rounded-full"
+                            aria-label="Add location (coming soon)"
+                        >
+                            <MapPin size={20} />
+                        </button>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex items-center space-x-4">
+                        <span
+                            className={`text-sm ${characterCount > maxCharCount
+                                    ? 'text-red-500'
+                                    : 'text-gray-500 dark:text-gray-400'
+                                }`}
+                        >
+                            {characterCount}/{maxCharCount}
+                        </span>
                         <button
                             onClick={handleSubmit}
-                            disabled={loading || text.trim().length === 0 || text.length > maxCharCount}
-                            className={`
-                px-4 py-2 rounded-full font-medium
-                ${loading || text.trim().length === 0 || text.length > maxCharCount
-                                    ? 'bg-blue-300 dark:bg-blue-800 cursor-not-allowed'
-                                    : 'bg-blue-500 hover:bg-blue-600 text-white'}
-              `}
+                            disabled={!canSubmit}
+                            className={`px-4 py-2 rounded-full font-bold text-white transition-colors duration-200 ${canSubmit
+                                    ? 'bg-blue-500 hover:bg-blue-600'
+                                    : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'
+                                }`}
                         >
                             {loading ? (
                                 <div className="flex items-center">
                                     <Loader2 size={16} className="animate-spin mr-2" />
-                                    Posting...
+                                    {uploadingImages ? 'Uploading...' : 'Posting...'}
                                 </div>
                             ) : (
                                 'Post'
