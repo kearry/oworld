@@ -25,30 +25,43 @@ interface CustomToken extends JWT {
 
 // Handle creating/upserting social login users
 async function upsertSocialUser(profile: SocialProfile) {
-    if (!profile.email) return null;
-    const existing = await prisma.user.findUnique({ where: { email: profile.email } });
-    if (existing) return existing;
+    try {
+        if (!profile.email) return null;
+        const existing = await prisma.user.findUnique({ where: { email: profile.email } });
+        if (existing) return existing;
 
-    // Create new user
-    const baseHandle = profile.name
-        ? profile.name.replace(/\s+/g, '').toLowerCase()
-        : profile.email.split('@')[0];
-    let handle = baseHandle;
-    let counter = 1;
-    while (await prisma.user.findUnique({ where: { handle } })) {
-        counter++;
-        handle = `${baseHandle}${counter}`;
-        if (counter > 10) throw new Error('Could not create unique handle');
+        // Create new user
+        const baseHandle = profile.name
+            ? profile.name.replace(/\s+/g, '').toLowerCase()
+            : profile.email.split('@')[0];
+        let handle = baseHandle;
+        let counter = 1;
+        
+        // Safety limit for loop
+        while (counter <= 10) {
+            const check = await prisma.user.findUnique({ where: { handle } });
+            if (!check) break;
+            counter++;
+            handle = `${baseHandle}${counter}`;
+        }
+
+        if (counter > 10) {
+            console.error('Could not create unique handle for social user');
+            return null;
+        }
+
+        return await prisma.user.create({
+            data: {
+                email: profile.email,
+                username: profile.name ?? baseHandle,
+                handle,
+                profileImage: profile.image || undefined,
+            },
+        });
+    } catch (error) {
+        console.error('Error in upsertSocialUser:', error);
+        return null;
     }
-
-    return prisma.user.create({
-        data: {
-            email: profile.email,
-            username: profile.name ?? baseHandle,
-            handle,
-            profileImage: profile.image || undefined,
-        },
-    });
 }
 
 export const authOptions: NextAuthOptions = {
@@ -61,32 +74,37 @@ export const authOptions: NextAuthOptions = {
                 password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
-                if (!credentials) return null;
-                const parsed = signInSchema.safeParse(credentials);
-                if (!parsed.success) return null;
-                const { emailOrUsername, password } = parsed.data;
+                try {
+                    if (!credentials) return null;
+                    const parsed = signInSchema.safeParse(credentials);
+                    if (!parsed.success) return null;
+                    const { emailOrUsername, password } = parsed.data;
 
-                const user = await prisma.user.findFirst({
-                    where: {
-                        OR: [
-                            { email: emailOrUsername },
-                            { username: emailOrUsername },
-                            { handle: emailOrUsername.replace(/^@/, '') },
-                        ],
-                    },
-                });
-                if (!user?.password) return null;
+                    const user = await prisma.user.findFirst({
+                        where: {
+                            OR: [
+                                { email: emailOrUsername },
+                                { username: emailOrUsername },
+                                { handle: emailOrUsername.replace(/^@/, '') },
+                            ],
+                        },
+                    });
+                    if (!user?.password) return null;
 
-                const valid = await compare(password, user.password);
-                if (!valid) return null;
+                    const valid = await compare(password, user.password);
+                    if (!valid) return null;
 
-                return {
-                    id: user.id,
-                    email: user.email,
-                    name: user.username,
-                    image: user.profileImage,
-                    handle: user.handle,
-                };
+                    return {
+                        id: user.id,
+                        email: user.email,
+                        name: user.username,
+                        image: user.profileImage,
+                        handle: user.handle,
+                    };
+                } catch (error) {
+                    console.error('Error in authorize:', error);
+                    return null;
+                }
             },
         }),
         GitHubProvider({
@@ -110,16 +128,20 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async jwt({ token, user, account, profile }) {
             const customToken = token as CustomToken;
-            if (account && user) {
-                customToken.id = user.id;
-                if (account.provider !== 'credentials' && profile) {
-                    const dbUser = await upsertSocialUser({
-                        email: profile.email,
-                        name: profile.name,
-                        image: profile.image,
-                    });
-                    if (dbUser) customToken.id = dbUser.id;
+            try {
+                if (account && user) {
+                    customToken.id = user.id;
+                    if (account.provider !== 'credentials' && profile) {
+                        const dbUser = await upsertSocialUser({
+                            email: profile.email,
+                            name: profile.name,
+                            image: profile.image,
+                        });
+                        if (dbUser) customToken.id = dbUser.id;
+                    }
                 }
+            } catch (error) {
+                console.error('Error in jwt callback:', error);
             }
             return customToken;
         },
@@ -144,8 +166,8 @@ export const authOptions: NextAuthOptions = {
                         (session.user as any).name = dbUser.username;
                         (session.user as any).image = dbUser.profileImage;
                     }
-                } catch {
-                    // ignore errors
+                } catch (error) {
+                    console.error('Error in session callback:', error);
                 }
             }
 
