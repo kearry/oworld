@@ -26,3 +26,24 @@ Exceptions thrown during database operations within the `next-auth` configuratio
 
 ### Fix Commit ID
 `3737a9036e611a00ffc1f65fdd8d278ff24283cd`
+
+## Fix: TypeError: localStorage.getItem (2025-11-28)
+
+### Issue
+Users experienced a HTTP 500 error caused by `TypeError: localStorage.getItem`. This happens when the application attempts to access `localStorage` in an environment where it is either undefined or null (e.g., during Server-Side Rendering in Next.js, or in restrictive environments).
+
+### Root Cause
+The `src/context/ui-context.tsx` file accessed `localStorage` directly within `useEffect` and event handlers. While `useEffect` usually runs only on the client, there are edge cases (or testing environments/specific runtime conditions) where `window` might be defined but `localStorage` is not, or `localStorage` access throws unexpectedly. Specifically, the error `TypeError: localStorage.getItem` implies `localStorage` was accessed when it was null/undefined.
+
+### Fix
+Modified `src/context/ui-context.tsx` to strictly guard all `localStorage` accesses with:
+`if (typeof window !== 'undefined' && window.localStorage)`
+This ensures that we never attempt to read or write properties on `localStorage` unless it is explicitly available.
+
+### Matching Test
+- **Test File:** `src/context/ui-context.test.tsx`
+- **Test Case:** "should not crash if localStorage is undefined"
+- **Test Case:** "should safely handle toggleDarkMode when localStorage is undefined"
+
+### Fix Commit ID
+(To be committed)

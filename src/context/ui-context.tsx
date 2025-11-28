@@ -28,7 +28,9 @@ export function UIProvider({ children }: { children: ReactNode }) {
         const newMode = !darkMode;
         setDarkMode(newMode);
         try {
-            localStorage.setItem('darkMode', newMode.toString());
+            if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.setItem('darkMode', newMode.toString());
+            }
         } catch { }
         if (newMode) {
             document.documentElement.classList.add('dark');
@@ -41,7 +43,9 @@ export function UIProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         let saved = false;
         try {
-            saved = localStorage.getItem('darkMode') === 'true';
+            if (typeof window !== 'undefined' && window.localStorage) {
+                saved = localStorage.getItem('darkMode') === 'true';
+            }
         } catch { }
         if (saved) {
             setDarkMode(true);
