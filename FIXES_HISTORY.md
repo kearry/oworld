@@ -37,13 +37,15 @@ The `src/context/ui-context.tsx` file accessed `localStorage` directly within `u
 
 ### Fix
 Modified `src/context/ui-context.tsx` to strictly guard all `localStorage` accesses with:
-`if (typeof window !== 'undefined' && window.localStorage)`
-This ensures that we never attempt to read or write properties on `localStorage` unless it is explicitly available.
+`if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function')`
+(and similarly for `setItem`).
+This ensures that we never attempt to read or write properties on `localStorage` unless it is explicitly available and functional.
 
 ### Matching Test
 - **Test File:** `src/context/ui-context.test.tsx`
 - **Test Case:** "should not crash if localStorage is undefined"
 - **Test Case:** "should safely handle toggleDarkMode when localStorage is undefined"
+- **Test Case:** "should not crash if localStorage exists but getItem is not a function"
 
 ### Fix Commit ID
 (To be committed)

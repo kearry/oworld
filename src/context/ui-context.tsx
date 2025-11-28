@@ -28,8 +28,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
         const newMode = !darkMode;
         setDarkMode(newMode);
         try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                localStorage.setItem('darkMode', newMode.toString());
+            if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.setItem === 'function') {
+                window.localStorage.setItem('darkMode', newMode.toString());
             }
         } catch { }
         if (newMode) {
@@ -43,8 +43,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         let saved = false;
         try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                saved = localStorage.getItem('darkMode') === 'true';
+            if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
+                saved = window.localStorage.getItem('darkMode') === 'true';
             }
         } catch { }
         if (saved) {

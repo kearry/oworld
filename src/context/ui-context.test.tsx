@@ -54,4 +54,21 @@ describe('UIContext LocalStorage Safety', () => {
 
         expect(result.current.darkMode).toBe(true); // Toggled from false to true
     });
+
+    it('should not crash if localStorage exists but getItem is not a function', () => {
+        // Simulate environment where localStorage is an object but missing methods
+        const localStorageMock = {}; 
+        Object.defineProperty(window, 'localStorage', {
+            value: localStorageMock,
+            writable: true
+        });
+
+        const wrapper = ({ children }: { children: React.ReactNode }) => (
+            <UIProvider>{children}</UIProvider>
+        );
+
+        expect(() => {
+            renderHook(() => useUI(), { wrapper });
+        }).not.toThrow();
+    });
 });
