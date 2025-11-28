@@ -48,4 +48,21 @@ This ensures that we never attempt to read or write properties on `localStorage`
 - **Test Case:** "should not crash if localStorage exists but getItem is not a function"
 
 ### Fix Commit ID
+`3d87ee9...`
+
+## Fix: Missing .env File Causing JWT Errors (2025-11-28)
+
+### Issue
+The application was failing with `[next-auth][error][JWT_SESSION_ERROR]` and `TypeError: localStorage.getItem is not a function`. The `localStorage` error was a side effect of the Next.js Error Overlay trying to display the fatal auth error. The root cause was the application crashing due to a missing `NEXTAUTH_SECRET` and other environment variables.
+
+### Root Cause
+The `.env` file was missing from the project root. While `.env.example` existed, the actual environment file used by `next-auth` to load the `NEXTAUTH_SECRET` was absent. This caused `next-auth` to fail drastically during session decryption, leading to a 500 error. When Next.js tried to show this error in the overlay, it triggered the `localStorage` issue (likely due to the specific CLI/environment context).
+
+### Fix
+Created a `.env` file populated with content from `.env.example` and a generated 32-byte base64 string for `NEXTAUTH_SECRET`.
+
+### Matching Test
+- **Manual Verification:** The presence of the `.env` file should resolve the `JWT_SESSION_ERROR` and allow the application to start without the 500 error loop.
+
+### Fix Commit ID
 (To be committed)
