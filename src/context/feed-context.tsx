@@ -1,7 +1,7 @@
 // src/context/feed-context.tsx
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Post, Community } from '@/lib/validations';
 
@@ -30,6 +30,7 @@ type FeedContextType = {
 const FeedContext = createContext<FeedContextType | undefined>(undefined);
 
 export function FeedProvider({ children }: { children: ReactNode }) {
+    const PAGE_SIZE = 10;
     const [activeTab, setActiveTab] = useState<FeedTab>('for-you');
     const [userCommunities, setUserCommunities] = useState<Community[]>([]);
     const [posts, setPosts] = useState<CompletePost[]>([]);
@@ -38,6 +39,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const { data: session } = useSession();
+    const isFetchingRef = useRef(false);
 
     // Safely extract current user ID from session
     const currentUserId = session?.user ? (session.user as { id: string }).id : null;
@@ -65,8 +67,9 @@ export function FeedProvider({ children }: { children: ReactNode }) {
 
     const fetchPosts = useCallback(
         async (pageNum: number, replace = false) => {
-            if (loading) return;
+            if (isFetchingRef.current) return;
             setLoading(true);
+            isFetchingRef.current = true;
             setError(null);
             try {
                 let endpoint = '';
@@ -77,11 +80,21 @@ export function FeedProvider({ children }: { children: ReactNode }) {
                 const response = await fetch(endpoint);
                 if (!response.ok) throw new Error('Failed to fetch posts');
                 const data: CompletePost[] = await response.json();
-                if (data.length === 0) setHasMore(false);
-                else {
+                if (data.length === 0) {
+                    setHasMore(false);
+                    if (replace) setPosts([]);
+                } else {
                     setPage(pageNum);
-                    setPosts(prev => (replace ? data : [...prev, ...data]));
-                    setHasMore(true);
+                    setPosts(prev => {
+                        const combined = replace ? data : [...prev, ...data];
+                        const seen = new Set<string>();
+                        return combined.filter(item => {
+                            if (seen.has(item.id)) return false;
+                            seen.add(item.id);
+                            return true;
+                        });
+                    });
+                    setHasMore(data.length === PAGE_SIZE);
                 }
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to fetch posts');
@@ -89,14 +102,15 @@ export function FeedProvider({ children }: { children: ReactNode }) {
                 console.error(`Error fetching posts:`, err);
             } finally {
                 setLoading(false);
+                isFetchingRef.current = false;
             }
         },
-        [activeTab, loading]
+        [activeTab]
     );
 
     const loadMorePosts = useCallback(async () => {
-        if (hasMore && !loading) await fetchPosts(page + 1);
-    }, [fetchPosts, hasMore, loading, page]);
+        if (hasMore && !isFetchingRef.current) await fetchPosts(page + 1);
+    }, [fetchPosts, hasMore, page]);
 
     const refreshFeed = useCallback(async () => {
         setPage(1);
@@ -137,4 +151,3 @@ export function useFeed() {
     if (!context) throw new Error('useFeed must be used within a FeedProvider');
     return context;
 }
-

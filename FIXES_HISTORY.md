@@ -66,3 +66,39 @@ Created a `.env` file populated with content from `.env.example` and a generated
 
 ### Fix Commit ID
 (To be committed)
+
+## Fix: Duplicate Feed Keys from Overlapping Pages (2025-04-17)
+
+### Issue
+React logged `Encountered two children with the same key` while rendering the feed, caused by duplicate posts returned across paginated fetches.
+
+### Root Cause
+When fetching additional pages, the feed concatenated previous and next page results without deduplicating by `id`, so overlapping responses produced duplicate React keys.
+
+### Fix
+`src/context/feed-context.tsx` now filters combined posts by `id` after concatenation, ensuring each post appears once even when APIs return overlaps.
+
+### Matching Test
+- **Test File:** `src/context/feed-context.test.tsx`
+- **Test Case:** "removes duplicate posts across paginated fetches"
+
+### Fix Commit ID
+(To be committed)
+
+## Fix: Excessive Feed Fetch Loop (2025-04-17)
+
+### Issue
+The feed issued repeated `GET /api/posts/for-you?page=1` (and subsequent pages) from a single page view.
+
+### Root Cause
+`fetchPosts` was memoized with `loading` as a dependency, so every load toggle recreated the callback, which recreated `refreshFeed`, retriggering the `useEffect` that calls `refreshFeed`—causing a fetch loop.
+
+### Fix
+Use a stable `fetchPosts` (no `loading` dependency) and guard concurrent fetches with a ref. `loadMorePosts` now checks the ref instead of `loading`.
+
+### Matching Test
+- **Test File:** `src/context/feed-context.test.tsx`
+- **Test Case:** "does not loop initial fetches on first render"
+
+### Fix Commit ID
+(To be committed)

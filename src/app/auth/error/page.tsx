@@ -1,11 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
 
 export default function AuthErrorPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+                    <div className="max-w-md w-full space-y-4 bg-white dark:bg-gray-800 p-8 rounded-xl shadow-md text-center">
+                        <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400 mx-auto" />
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">Loading error details…</p>
+                    </div>
+                </div>
+            }
+        >
+            <AuthErrorContent />
+        </Suspense>
+    );
+}
+
+function AuthErrorContent() {
     const searchParams = useSearchParams();
     const [errorMessage, setErrorMessage] = useState<string>('An unknown error occurred');
     const [errorDescription, setErrorDescription] = useState<string>('');

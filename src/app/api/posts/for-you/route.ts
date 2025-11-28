@@ -1,13 +1,16 @@
 // src/app/api/posts/for-you/route.ts
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/db';
+import { safeGetServerSession } from '@/lib/safeSession';
 
 export async function GET(): Promise<NextResponse> {
     // Authenticate the user
-    const session = await getServerSession(authOptions);
+    const { session, error: sessionError } = await safeGetServerSession();
+    if (sessionError) {
+        console.error('Session retrieval failed in GET /api/posts/for-you:', sessionError);
+        return NextResponse.json({ error: 'Authentication unavailable' }, { status: 500 });
+    }
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

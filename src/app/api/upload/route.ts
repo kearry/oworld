@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { authOptions } from '@/lib/auth';
+import { safeGetServerSession } from '@/lib/safeSession';
 
 // POST /api/upload - Upload one or more images
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const { session, error: sessionError } = await safeGetServerSession();
+        if (sessionError) {
+            console.error('Session retrieval failed in POST /api/upload:', sessionError);
+            return NextResponse.json(
+                { error: 'Authentication unavailable' },
+                { status: 500 }
+            );
+        }
         if (!session?.user) {
             return NextResponse.json(
                 { error: 'Unauthorized' },

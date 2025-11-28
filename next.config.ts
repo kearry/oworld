@@ -2,14 +2,14 @@
 const nextConfig = {
   serverExternalPackages: ['bcrypt'],
   images: {
-    domains: [
-      'lh3.googleusercontent.com',  // Google profile images
-      'i.pravatar.cc',              // Pravatar avatars (used in seed data)
-      'picsum.photos',              // Lorem Picsum (used in seed data)
-      'avatars.githubusercontent.com', // GitHub profile images
-      'platform-lookaside.fbsbx.com', // Facebook profile images
-      'pbs.twimg.com',
-      'localhost',                    // this is for local development
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' }, // Google profile images
+      { protocol: 'https', hostname: 'i.pravatar.cc' }, // Pravatar avatars (seed)
+      { protocol: 'https', hostname: 'picsum.photos' }, // Lorem Picsum (seed)
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' }, // GitHub profile images
+      { protocol: 'https', hostname: 'platform-lookaside.fbsbx.com' }, // Facebook profile images
+      { protocol: 'https', hostname: 'pbs.twimg.com' }, // Twitter images
+      { protocol: 'http', hostname: 'localhost' }, // local dev
     ],
   },
   experimental: {

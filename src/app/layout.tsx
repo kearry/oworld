@@ -3,11 +3,11 @@ import './globals.css';
 //import { Inter } from 'next/font/google';
 import type { Metadata } from 'next';
 import { ReactNode } from 'react';
-import { getServerSession } from 'next-auth/next';
 import AuthProvider from '@/components/providers/AuthProvider';
 import { UIProvider } from '@/context/ui-context';
 import ClientLayout from '@/components/layout/ClientLayout';
-import { authOptions } from '@/lib/auth';
+import { safeGetServerSession } from '@/lib/safeSession';
+import '@/lib/localStorageShim';
 
 //const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ interface RootLayoutProps {
 }
 
 export default async function RootLayout({ children }: RootLayoutProps) {
-  const session = await getServerSession(authOptions);
+  const { session } = await safeGetServerSession();
 
   return (
     <html lang="en">

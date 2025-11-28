@@ -9,6 +9,7 @@ import { compare } from 'bcrypt';
 import prisma from './db';
 import { signInSchema } from './validations';
 import { JWT } from 'next-auth/jwt';
+import crypto from 'crypto';
 
 // Define a more specific profile type for upsertSocialUser
 interface SocialProfile {
@@ -23,8 +24,63 @@ interface CustomToken extends JWT {
     picture?: string;
 }
 
+function resolveAuthSecret(): string {
+    if (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length >= 32) {
+        return process.env.NEXTAUTH_SECRET;
+    }
+    const fallback = crypto.randomBytes(32).toString('base64');
+    console.warn(
+        'NEXTAUTH_SECRET is missing or too short; generated a fallback secret for this runtime. ' +
+        'Set NEXTAUTH_SECRET in your environment to avoid session invalidation and 500s.'
+    );
+    return fallback;
+}
+
+function buildOAuthProviders() {
+    const providers = [];
+
+    if (process.env.GITHUB_ID && process.env.GITHUB_SECRET) {
+        providers.push(
+            GitHubProvider({
+                clientId: process.env.GITHUB_ID,
+                clientSecret: process.env.GITHUB_SECRET,
+            })
+        );
+    }
+
+    if (process.env.GOOGLE_ID && process.env.GOOGLE_SECRET) {
+        providers.push(
+            GoogleProvider({
+                clientId: process.env.GOOGLE_ID,
+                clientSecret: process.env.GOOGLE_SECRET,
+            })
+        );
+    }
+
+    if (process.env.FACEBOOK_ID && process.env.FACEBOOK_SECRET) {
+        providers.push(
+            FacebookProvider({
+                clientId: process.env.FACEBOOK_ID,
+                clientSecret: process.env.FACEBOOK_SECRET,
+            })
+        );
+    }
+
+    if (process.env.TWITTER_ID && process.env.TWITTER_SECRET) {
+        providers.push(
+            TwitterProvider({
+                clientId: process.env.TWITTER_ID,
+                clientSecret: process.env.TWITTER_SECRET,
+                version: '2.0',
+            })
+        );
+    }
+
+    return providers;
+}
+
 // Handle creating/upserting social login users
-async function upsertSocialUser(profile: SocialProfile) {
+export async function upsertSocialUser(profile: SocialProfile) {
     try {
         if (!profile.email) return null;
         const existing = await prisma.user.findUnique({ where: { email: profile.email } });
@@ -107,23 +163,7 @@ export const authOptions: NextAuthOptions = {
                 }
             },
         }),
-        GitHubProvider({
-            clientId: process.env.GITHUB_ID!,
-            clientSecret: process.env.GITHUB_SECRET!,
-        }),
-        GoogleProvider({
-            clientId: process.env.GOOGLE_ID!,
-            clientSecret: process.env.GOOGLE_SECRET!,
-        }),
-        FacebookProvider({
-            clientId: process.env.FACEBOOK_ID!,
-            clientSecret: process.env.FACEBOOK_SECRET!,
-        }),
-        TwitterProvider({
-            clientId: process.env.TWITTER_ID!,
-            clientSecret: process.env.TWITTER_SECRET!,
-            version: '2.0',
-        }),
+        ...buildOAuthProviders(),
     ],
     callbacks: {
         async jwt({ token, user, account, profile }) {
@@ -178,6 +218,6 @@ export const authOptions: NextAuthOptions = {
         signIn: '/auth/signin',
         error: '/auth/error',
     },
-    secret: process.env.NEXTAUTH_SECRET,
-    debug: process.env.NODE_ENV === 'development',
+    secret: resolveAuthSecret(),
+    debug: process.env.NEXTAUTH_DEBUG === 'true',
 };

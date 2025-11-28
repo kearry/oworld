@@ -1,9 +1,8 @@
 // src/app/api/users/[id]/follows/[targetId]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/db';
+import { safeGetServerSession } from '@/lib/safeSession';
 
 export async function GET(
     _request: NextRequest,
@@ -11,7 +10,11 @@ export async function GET(
 ): Promise<NextResponse> {
     const { id: userId, targetId } = await context.params;
 
-    const session = await getServerSession(authOptions);
+    const { session, error: sessionError } = await safeGetServerSession();
+    if (sessionError) {
+        console.error('Session retrieval failed in GET /api/users/[id]/follows/[targetId]:', sessionError);
+        return NextResponse.json({ error: 'Authentication unavailable' }, { status: 500 });
+    }
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -42,7 +45,11 @@ export async function POST(
 ): Promise<NextResponse> {
     const { id: userId, targetId } = await context.params;
 
-    const session = await getServerSession(authOptions);
+    const { session, error: sessionError } = await safeGetServerSession();
+    if (sessionError) {
+        console.error('Session retrieval failed in POST /api/users/[id]/follows/[targetId]:', sessionError);
+        return NextResponse.json({ error: 'Authentication unavailable' }, { status: 500 });
+    }
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -80,7 +87,11 @@ export async function DELETE(
 ): Promise<NextResponse> {
     const { id: userId, targetId } = await context.params;
 
-    const session = await getServerSession(authOptions);
+    const { session, error: sessionError } = await safeGetServerSession();
+    if (sessionError) {
+        console.error('Session retrieval failed in DELETE /api/users/[id]/follows/[targetId]:', sessionError);
+        return NextResponse.json({ error: 'Authentication unavailable' }, { status: 500 });
+    }
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

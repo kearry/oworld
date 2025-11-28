@@ -1,15 +1,18 @@
 // src/app/api/posts/[id]/like/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/db';
+import { safeGetServerSession } from '@/lib/safeSession';
 
 export async function POST(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
-    const session = await getServerSession(authOptions);
+    const { session, error: sessionError } = await safeGetServerSession();
+    if (sessionError) {
+        console.error('Session retrieval failed in POST /api/posts/[id]/like:', sessionError);
+        return NextResponse.json({ error: 'Authentication unavailable' }, { status: 500 });
+    }
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -44,7 +47,11 @@ export async function DELETE(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
-    const session = await getServerSession(authOptions);
+    const { session, error: sessionError } = await safeGetServerSession();
+    if (sessionError) {
+        console.error('Session retrieval failed in DELETE /api/posts/[id]/like:', sessionError);
+        return NextResponse.json({ error: 'Authentication unavailable' }, { status: 500 });
+    }
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
